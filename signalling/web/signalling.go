@@ -16,7 +16,12 @@ func (h *handler) InitializeWS(c *fiber.Ctx) error {
 }
 
 func (h *handler) HandleWS(c *websocket.Conn) {
-	log.Println("Got a connection on room ID", c.Params("room_id"))
+	roomID := c.Params("room_id")
+
+	h.addClient(roomID, c)
+	defer h.removeClient(roomID, c)
+
+	log.Println("Got a connection on room ID", roomID)
 
 	for {
 		_, msg, err := c.ReadMessage()
@@ -25,6 +30,6 @@ func (h *handler) HandleWS(c *websocket.Conn) {
 			return
 		}
 
-		c.WriteMessage(1, msg)
+		h.broadcast(roomID, c, msg)
 	}
 }

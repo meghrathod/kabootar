@@ -5,6 +5,7 @@ go 1.19
 require (
 	github.com/gofiber/fiber/v2 v2.37.0
 	github.com/gofiber/websocket/v2 v2.0.25
+	github.com/puzpuzpuz/xsync v1.4.3
 )
 
 require (
