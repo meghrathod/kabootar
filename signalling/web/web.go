@@ -13,7 +13,11 @@ func InitWeb(address string) error {
 		return c.SendString("Pong!")
 	})
 
-	h := &handler{rooms: xsync.NewMapOf[*Room]()}
+	h := &handler{
+		rooms: xsync.NewMapOf[*Room](),
+	}
+
+	app.Post("/room", h.CreateRoom)
 	app.Get("/ws/:room_id", h.InitializeWS, websocket.New(h.HandleWS))
 
 	return app.Listen(address)
