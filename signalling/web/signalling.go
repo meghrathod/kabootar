@@ -17,7 +17,16 @@ func (h *handler) InitializeWS(c *fiber.Ctx) error {
 
 func (h *handler) HandleWS(c *websocket.Conn) {
 	roomID := c.Params("room_id")
-	log.Println("Got a connection on room ID", roomID)
+
+	key := c.Query("k", "")
+	isMaster := c.Query("m", "f") == "t"
+
+	if !h.joinRoom(roomID, key, isMaster, c) {
+		c.Close()
+		return
+	}
+
+	log.Println("Got a connection on room ID", roomID, "master =", isMaster)
 
 	for {
 		_, _, err := c.ReadMessage()
