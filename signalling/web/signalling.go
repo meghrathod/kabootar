@@ -21,15 +21,22 @@ func (h *handler) HandleWS(c *websocket.Conn) {
 	key := c.Query("k", "")
 	isMaster := c.Query("m", "f") == "t"
 
-	if !h.joinRoom(roomID, key, isMaster, c) {
+	canJoin, clientID := h.joinRoom(roomID, key, isMaster, c)
+	if !canJoin {
 		c.Close()
 		return
 	}
 
-	log.Println("Got a connection on room ID", roomID, "master =", isMaster)
+	defer h.leaveRoom(roomID, clientID, isMaster)
 
 	for {
-		_, _, err := c.ReadMessage()
+		_, payload, err := c.ReadMessage()
+		if err != nil {
+			log.Println("Error", err)
+			return
+		}
+
+		err = h.handleMsg(roomID, clientID, payload, isMaster)
 		if err != nil {
 			log.Println("Error", err)
 			return

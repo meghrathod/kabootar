@@ -1,6 +1,10 @@
 package web
 
-import "strconv"
+import (
+	"encoding/json"
+	"errors"
+	"strconv"
+)
 
 type ProtoSMsg interface {
 	Marshal() []string
@@ -46,15 +50,18 @@ const (
 )
 
 type ProtoMSMsgPayload struct {
-	Msg string
+	ClientID string
+	Msg      string
 }
 
 func (p *ProtoMSMsgPayload) Unmarshal(data []string) {
-	p.Msg = data[1]
+	p.ClientID = data[1]
+	p.Msg = data[2]
 }
 
 const (
 	ProtoSCMsg = iota
+	ProtoSCGone
 )
 
 type ProtoSCMsgPayload struct {
@@ -63,6 +70,12 @@ type ProtoSCMsgPayload struct {
 
 func (p *ProtoSCMsgPayload) Marshal() []string {
 	return []string{strconv.Itoa(ProtoSCMsg), p.Msg}
+}
+
+type ProtoSCGonePayload struct{}
+
+func (p *ProtoSCGonePayload) Marshal() []string {
+	return []string{strconv.Itoa(ProtoSCGone)}
 }
 
 const (
@@ -75,4 +88,43 @@ type ProtoCSMsgPayload struct {
 
 func (p *ProtoCSMsgPayload) Unmarshal(data []string) {
 	p.Msg = data[1]
+}
+
+func MarshalSMsg(payload ProtoSMsg) ([]byte, error) {
+	return json.Marshal(payload.Marshal())
+}
+
+func UnmarshalPMsg(payload []byte, isMaster bool) (ProtoPMsg, error) {
+	var msg []string
+	err := json.Unmarshal(payload, &msg)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(msg) < 1 {
+		return nil, errors.New("invalid payload")
+	}
+
+	msgType, err := strconv.Atoi(msg[0])
+	if err != nil {
+		return nil, err
+	}
+
+	if isMaster {
+		if msgType == ProtoMSMsg {
+			p := &ProtoMSMsgPayload{}
+			p.Unmarshal(msg)
+
+			return p, nil
+		}
+	} else {
+		if msgType == ProtoCSMsg {
+			p := &ProtoCSMsgPayload{}
+			p.Unmarshal(msg)
+
+			return p, nil
+		}
+	}
+
+	return nil, errors.New("invalid message type")
 }
