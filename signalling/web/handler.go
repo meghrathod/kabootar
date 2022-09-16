@@ -73,3 +73,6 @@ func (h *handler) joinRoom(
 
 	return true
 }
+
+func (h *handler) leaveRoom(roomID string, isMaster bool, conn *websocket.Conn) {
+}
