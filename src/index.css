@@ -1,0 +1,27 @@
+@import url(https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap);
+@import url(https://fonts.googleapis.com/css2?family=Public+Sans:wght@100..900&display=swap);
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-black text-white h-[100vh];
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+.heading {
+  font-family: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
+}
+
+#root {
+  @apply h-full;
+}
+
+.text-goo {
+  background: linear-gradient(94.26deg, #007cf0 0%, #00dfd8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-fill-color: transparent;
+}
