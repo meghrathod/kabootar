@@ -53,15 +53,15 @@ const SexyButton: Component<{
       >
         <div
           class="
-          button-sexy-div-p
-          rounded-md
-          py-[0.875rem]
-          bg-black
-          hover:bg-transparent
-          hover:text-black
-          transition-colors
-          duration-200
-        "
+            button-sexy-div-p
+            rounded-md
+            py-[0.875rem]
+            bg-black
+            hover:bg-transparent
+            hover:text-black
+            transition-colors
+            duration-200
+          "
         >
           {props.children}
         </div>
