@@ -10,6 +10,11 @@ type Room struct {
 	MKey string
 	CKey string
 
+	PIN         string
+	DiscoveryIP string
+	Name        string
+	Emoji       string
+
 	Master  *websocket.Conn
 	Clients *xsync.MapOf[*websocket.Conn]
 }
@@ -25,9 +30,17 @@ func NewRoom() (*Room, error) {
 		return nil, err
 	}
 
+	pin, err := util.GeneratePIN()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Room{
 		MKey:    mKey,
 		CKey:    cKey,
+		PIN:     pin,
+		Name:    util.GenerateRandomWord() + " " + util.GenerateRandomWord(),
+		Emoji:   util.GenerateRandomEmoji(),
 		Master:  nil,
 		Clients: xsync.NewMapOf[*websocket.Conn](),
 	}, nil

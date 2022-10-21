@@ -22,7 +22,8 @@ func InitWeb(address string) error {
 	})
 
 	h := &handler{
-		rooms: xsync.NewMapOf[*Room](),
+		rooms:        xsync.NewMapOf[*Room](),
+		discoverable: xsync.NewMapOf[map[*Room]struct{}](),
 	}
 
 	app.Post("/room", h.CreateRoom)

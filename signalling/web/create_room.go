@@ -1,17 +1,46 @@
 package web
 
 import (
+	"encoding/json"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 func (h *handler) CreateRoom(c *fiber.Ctx) error {
+	var body []string
+	err := json.Unmarshal(c.Body(), &body)
+	if err != nil {
+		return c.SendStatus(400)
+	}
+
+	var discoverable bool
+	var ip string
+	if len(body) == 0 {
+		return c.SendStatus(400)
+	}
+
+	if body[0] == "t" {
+		if len(body) < 2 {
+			return c.SendStatus(400)
+		}
+
+		discoverable = true
+		ip = body[1]
+	}
+
 	roomID, room, err := h.newRoom()
 	if err != nil {
 		log.Println("Error creating room:", err)
 		return c.SendStatus(500)
 	}
 
-	return c.JSON([]string{roomID, room.MKey, room.CKey})
+	if discoverable {
+		h.makeDiscoverable(ip, room)
+	}
+
+	return c.JSON([]string{
+		roomID, room.MKey, room.CKey,
+		room.Name, room.PIN, room.Emoji,
+	})
 }

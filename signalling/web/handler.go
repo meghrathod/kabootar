@@ -9,7 +9,8 @@ import (
 )
 
 type handler struct {
-	rooms *xsync.MapOf[*Room]
+	rooms        *xsync.MapOf[*Room]
+	discoverable *xsync.MapOf[map[*Room]struct{}]
 }
 
 func (h *handler) newRoom() (string, *Room, error) {
@@ -25,6 +26,16 @@ func (h *handler) newRoom() (string, *Room, error) {
 
 	h.rooms.Store(roomID, room)
 	return roomID, room, nil
+}
+
+func (h *handler) makeDiscoverable(ip string, room *Room) {
+	rooms, ok := h.discoverable.Load(ip)
+	if !ok {
+		rooms = make(map[*Room]struct{})
+		h.discoverable.Store(ip, rooms)
+	}
+
+	rooms[room] = struct{}{}
 }
 
 func (h *handler) getRoom(id string) (*Room, bool) {
@@ -110,6 +121,11 @@ func (h *handler) leaveRoom(
 		})
 
 		h.rooms.Delete(roomID)
+
+		rooms, ok := h.discoverable.Load(room.DiscoveryIP)
+		if ok {
+			delete(rooms, room)
+		}
 	} else {
 		room.Clients.Delete(clientID)
 
