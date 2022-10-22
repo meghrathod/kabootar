@@ -84,8 +84,10 @@ const LinkActions: Component<{ url: string }> = (props) => {
   }
 
   function shareURL() {
-    // noinspection JSIgnoredPromiseFromCall
-    navigator.share({ text: props.url });
+    if (shareAvailable) {
+      // noinspection JSIgnoredPromiseFromCall
+      navigator.share({ text: props.url });
+    }
   }
 
   return (
@@ -141,7 +143,7 @@ const LinkActions: Component<{ url: string }> = (props) => {
   );
 };
 
-const Footer: Component<{ numPeers: number }> = (props) => {
+const MasterFooter: Component<{ numPeers: number }> = (props) => {
   return (
     <p>
       <span class="font-bold">Peers:</span> {props.numPeers}/8
@@ -149,8 +151,44 @@ const Footer: Component<{ numPeers: number }> = (props) => {
   );
 };
 
-const SharePage: Component = () => {
+const ClientFooter: Component<{ progress: number }> = (props) => {
+  return (
+    <p>
+      <span class="font-bold">Receiving:</span> {props.progress}%
+    </p>
+  );
+};
+
+const MasterShare: Component = () => {
   const url = window.location.href;
+
+  return (
+    <>
+      <LinkActions url={url} />
+      <MasterFooter numPeers={3} />
+    </>
+  );
+};
+
+const ProgressBar: Component<{ progress: number }> = (props) => {
+  return (
+    <progress class="w-full h-2 rounded" max="100" value={props.progress} />
+  );
+};
+
+const ClientShare: Component = () => {
+  const percentage = 42;
+
+  return (
+    <>
+      <ProgressBar progress={percentage} />
+      <ClientFooter progress={percentage} />
+    </>
+  );
+};
+
+const SharePage: Component = () => {
+  const masterShare = false;
 
   return (
     <div
@@ -174,8 +212,7 @@ const SharePage: Component = () => {
           emoji={emoji}
           fileName="movie.mp4"
         />
-        <LinkActions url={url} />
-        <Footer numPeers={3} />
+        {masterShare ? <MasterShare /> : <ClientShare />}
       </div>
     </div>
   );

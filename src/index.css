@@ -50,3 +50,23 @@ body {
   @apply w-full py-2 pl-3 pr-2
   rounded-t-[0.3rem] lg:rounded-tr-none lg:rounded-bl-[0.3rem];
 }
+
+progress {
+  --track: rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+}
+
+progress::-webkit-progress-bar {
+  background-color: var(--track);
+  border-radius: 999px;
+}
+
+progress::-webkit-progress-value {
+  @apply background-goo;
+  border-radius: 999px;
+}
+
+progress::-moz-progress-bar {
+  @apply background-goo;
+  border-radius: 999px;
+}
