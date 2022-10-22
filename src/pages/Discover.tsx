@@ -1,5 +1,5 @@
 import { Title } from "@solidjs/meta";
-import { type Component, createEffect, createSignal, For } from "solid-js";
+import { type Component, For } from "solid-js";
 import { createStore } from "solid-js/store";
 
 import DiscoveredRoom from "../components/DiscoveredRoom";
@@ -19,7 +19,7 @@ const DiscoverPage: Component = () => {
   ).then((client) => {});
 
   return (
-    <div class="px-12 pt-16 pb-8 lg:px-20 lg:pt-20">
+    <div class="px-8 pt-12 pb-8 lg:px-20 lg:pt-20">
       <Title>Kabootar - Discover</Title>
 
       <h1 class="font-bold text-4xl lg:text-5xl heading">Discovering...</h1>
