@@ -9,8 +9,17 @@ import (
 )
 
 type handler struct {
-	rooms        *xsync.MapOf[*Room]
-	discoverable *xsync.MapOf[map[*Room]struct{}]
+	rooms            *xsync.MapOf[*Room]
+	discoverable     *xsync.MapOf[map[*Room]struct{}]
+	discoveryClients *xsync.MapOf[map[*websocket.Conn]struct{}]
+}
+
+func newHandler() *handler {
+	return &handler{
+		rooms:            xsync.NewMapOf[*Room](),
+		discoverable:     xsync.NewMapOf[map[*Room]struct{}](),
+		discoveryClients: xsync.NewMapOf[map[*websocket.Conn]struct{}](),
+	}
 }
 
 func (h *handler) newRoom() (string, *Room, error) {
@@ -19,7 +28,7 @@ func (h *handler) newRoom() (string, *Room, error) {
 		return "", nil, err
 	}
 
-	room, err := NewRoom()
+	room, err := NewRoom(roomID)
 	if err != nil {
 		return "", nil, err
 	}
@@ -36,6 +45,53 @@ func (h *handler) makeDiscoverable(ip string, room *Room) {
 	}
 
 	rooms[room] = struct{}{}
+	h.notifyDiscoveryClients(ip, true, room)
+}
+
+func (h *handler) registerDiscoveryClient(ip string, conn *websocket.Conn) {
+	clients, ok := h.discoveryClients.Load(ip)
+	if !ok {
+		clients = make(map[*websocket.Conn]struct{})
+		h.discoveryClients.Store(ip, clients)
+	}
+
+	clients[conn] = struct{}{}
+
+	rooms, ok := h.discoverable.Load(ip)
+	if !ok {
+		return
+	}
+
+	for room := range rooms {
+		conn.WriteJSON([]string{"0", room.ID, room.Name, room.Emoji})
+	}
+}
+
+func (h *handler) unregisterDiscoveryClient(ip string, conn *websocket.Conn) {
+	clients, ok := h.discoveryClients.Load(ip)
+	if !ok {
+		return
+	}
+
+	delete(clients, conn)
+}
+
+func (h *handler) notifyDiscoveryClients(ip string, added bool, room *Room) {
+	clients, ok := h.discoveryClients.Load(ip)
+	if !ok {
+		return
+	}
+
+	var payload []string
+	if added {
+		payload = []string{"0", room.ID, room.Name, room.Emoji}
+	} else {
+		payload = []string{"1", room.ID}
+	}
+
+	for client := range clients {
+		client.WriteJSON(payload)
+	}
 }
 
 func (h *handler) getRoom(id string) (*Room, bool) {
@@ -124,7 +180,11 @@ func (h *handler) leaveRoom(
 
 		rooms, ok := h.discoverable.Load(room.DiscoveryIP)
 		if ok {
-			delete(rooms, room)
+			_, ok := rooms[room]
+			if ok {
+				delete(rooms, room)
+				h.notifyDiscoveryClients(room.DiscoveryIP, false, room)
+			}
 		}
 	} else {
 		room.Clients.Delete(clientID)

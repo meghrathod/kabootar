@@ -7,6 +7,8 @@ import (
 )
 
 type Room struct {
+	ID string
+
 	MKey string
 	CKey string
 
@@ -19,7 +21,7 @@ type Room struct {
 	Clients *xsync.MapOf[*websocket.Conn]
 }
 
-func NewRoom() (*Room, error) {
+func NewRoom(id string) (*Room, error) {
 	mKey, err := util.GenerateRandomString(24)
 	if err != nil {
 		return nil, err
@@ -36,6 +38,7 @@ func NewRoom() (*Room, error) {
 	}
 
 	return &Room{
+		ID:      id,
 		MKey:    mKey,
 		CKey:    cKey,
 		PIN:     pin,

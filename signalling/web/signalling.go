@@ -1,8 +1,6 @@
 package web
 
 import (
-	"log"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
@@ -26,19 +24,18 @@ func (h *handler) HandleWS(c *websocket.Conn) {
 		c.Close()
 		return
 	}
+	c.WriteJSON([]string{"-1"})
 
 	defer h.leaveRoom(roomID, clientID, isMaster)
 
 	for {
 		_, payload, err := c.ReadMessage()
 		if err != nil {
-			log.Println("Error", err)
 			return
 		}
 
 		err = h.handleMsg(roomID, clientID, payload, isMaster)
 		if err != nil {
-			log.Println("Error", err)
 			return
 		}
 	}

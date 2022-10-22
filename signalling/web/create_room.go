@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
+	"github.com/gargakshit/kabootar/signalling/util"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -25,8 +26,8 @@ func (h *handler) CreateRoom(c *fiber.Ctx) error {
 			return c.SendStatus(400)
 		}
 
-		discoverable = true
 		ip = body[1]
+		discoverable = util.IsIPPublic(ip)
 	}
 
 	roomID, room, err := h.newRoom()

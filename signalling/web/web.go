@@ -3,12 +3,13 @@ package web
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/websocket/v2"
-	"github.com/puzpuzpuz/xsync"
 )
 
 func InitWeb(address string) error {
 	app := fiber.New()
+	app.Use(recover.New())
 
 	app.Use(cors.New(cors.Config{
 		AllowHeaders:     "Content-Type, Access-Control-Allow-Origin",
@@ -21,13 +22,12 @@ func InitWeb(address string) error {
 		return c.SendString("Pong!")
 	})
 
-	h := &handler{
-		rooms:        xsync.NewMapOf[*Room](),
-		discoverable: xsync.NewMapOf[map[*Room]struct{}](),
-	}
+	h := newHandler()
 
 	app.Post("/room", h.CreateRoom)
 	app.Get("/ws/:room_id", h.InitializeWS, websocket.New(h.HandleWS))
+	app.Get("/discover", h.ValidateDiscoveryRequest,
+		h.InitializeWS, websocket.New(h.HandleDiscovery))
 
 	return app.Listen(address)
 }

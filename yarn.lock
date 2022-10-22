@@ -349,6 +349,18 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
+"@solid-primitives/map@^0.2.3":
+  version "0.2.3"
+  resolved "https://registry.yarnpkg.com/@solid-primitives/map/-/map-0.2.3.tgz#ce627c5d7cb1a236c75e474c1d4d60e454a3f63d"
+  integrity sha512-IqalsJH2g0hibY/kRZs+ZxSA4cfqHmyKtvHQSNx8+aRW2qjwuCUWak0pbHffBO0GnDvKVO2jbzhqNLx7KNCcaQ==
+  dependencies:
+    "@solid-primitives/utils" "^3.1.0"
+
+"@solid-primitives/utils@^3.1.0":
+  version "3.1.0"
+  resolved "https://registry.yarnpkg.com/@solid-primitives/utils/-/utils-3.1.0.tgz#52edf36dabe62eba94f8356c3b9b788234d088a8"
+  integrity sha512-/rerChcwgFtHEgVCCBY7BXGHh7a83HcIAzR8QhXJ789geIVbBs2YxHF4UUZlG7ec00NKSfvO3+sQquN/xKQLMw==
+
 "@solidjs/meta@^0.28.0":
   version "0.28.0"
   resolved "https://registry.yarnpkg.com/@solidjs/meta/-/meta-0.28.0.tgz#0c5e09eef8784c8ddd3196fadd64baa025e1a1de"
@@ -358,6 +370,11 @@
   version "0.5.0"
   resolved "https://registry.yarnpkg.com/@solidjs/router/-/router-0.5.0.tgz#b324c64f79d94c2b55011c2c8eea0a76771754fc"
   integrity sha512-rNR07l21tWWDVmCbaapggB89rEX7jlM2XChpTLqEGEnj46LzVZ8zgvjcF6NNKScByAlLpoQUkVIjB2KHpcMi+w==
+
+"@tailwindcss/line-clamp@^0.4.2":
+  version "0.4.2"
+  resolved "https://registry.yarnpkg.com/@tailwindcss/line-clamp/-/line-clamp-0.4.2.tgz#f353c5a8ab2c939c6267ac5b907f012e5ee130f9"
+  integrity sha512-HFzAQuqYCjyy/SX9sLGB1lroPzmcnWv1FHkIpmypte10hptf4oPUfucryMKovZh2u0uiS9U5Ty3GghWfEJGwVw==
 
 acorn-node@^1.8.2:
   version "1.8.2"

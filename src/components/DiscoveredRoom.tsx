@@ -1,18 +1,20 @@
 import { type Component } from "solid-js";
 
+import { type DiscoveredRoomItem } from "../types/room";
+
 const DiscoveredRoom: Component<{
-  backdrop: string;
-  emoji: string;
-  name: string;
+  room: DiscoveredRoomItem;
   onClick?: () => void;
 }> = (props) => {
   return (
     <div class="flex flex-row items-center my-4 gap-4">
       <p
-        style={{ background: props.backdrop }}
+        style={{ background: props.room.background }}
         class="
-          w-[48px]
-          h-[48px]
+          min-w-[48px]
+          min-h-[48px]
+          max-w-[48px]
+          max-h-[48px]
           text-[26px]
           flex
           justify-center
@@ -20,11 +22,12 @@ const DiscoveredRoom: Component<{
           text-center
           rounded-full
           font-bold
+          overflow-ellipsis
         "
       >
-        {props.emoji}
+        {props.room.emoji}
       </p>
-      <p class="text-xl">{props.name}</p>
+      <p class="text-xl line-clamp-1">{props.room.name}</p>
     </div>
   );
 };

@@ -26,6 +26,6 @@ export function getPublicIP(): Promise<string> {
     };
 
     pc.createDataChannel("dummy");
-    pc.setLocalDescription(await pc.createOffer());
+    await pc.setLocalDescription(await pc.createOffer());
   });
 }
