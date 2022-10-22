@@ -31,10 +31,11 @@ const HomePage: Component = () => {
           disabled={shareDisabled()}
           onClick={createRoom}
         >
-          Share a file
+          {shareDisabled() ? "Hang on..." : "Share a file"}
         </PrimaryButton>
         <SexyButton
           class="w-52"
+          disabled={shareDisabled()}
           onClick={() => {
             navigate("/discover");
           }}

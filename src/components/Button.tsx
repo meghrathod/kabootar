@@ -10,6 +10,8 @@ const PrimaryButton: Component<{
     <button
       class={`
         bg-white
+        disabled:bg-zinc-300
+        disabled:cursor-not-allowed
         text-black
         font-medium
         text-[1.2rem]
@@ -38,6 +40,7 @@ const SexyButton: Component<{
       <div class="absolute background-goo blur-3xl w-52 h-12" />
       <button
         class={`
+          disabled:cursor-not-allowed
           text-white
           font-medium
           text-[1.2rem]

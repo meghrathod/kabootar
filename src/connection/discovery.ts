@@ -51,8 +51,10 @@ class Discovery {
     this.removed(data[1]);
   }
 
-  private closeListener(event: CloseEvent) {
-    console.log("discovery closed");
+  private closeListener(_event: CloseEvent) {}
+
+  close() {
+    this.ws.close();
   }
 
   static async connect(
