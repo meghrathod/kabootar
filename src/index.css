@@ -30,8 +30,23 @@ body {
 }
 
 .button-sexy-div-p {
-  padding-left: calc(3rem - 4px);
-  padding-right: calc(3rem - 4px);
-  padding-top: calc(0.875rem - 4px);
-  padding-bottom: calc(0.875rem - 4px);
+  padding: calc(0.875rem - 4px) calc(3rem - 4px);
+}
+
+.emoji {
+  @apply min-w-[48px] min-h-[48px] max-w-[48px] max-h-[48px]
+  text-[26px] text-center flex items-center justify-center
+  rounded-full;
+}
+
+.button-inline-right {
+  @apply flex items-center justify-center gap-1
+  bg-white text-black font-medium shadow-xl
+  min-w-max px-4 py-2
+  rounded-b-[0.3rem] lg:rounded-bl-none lg:rounded-tr-[0.3rem];
+}
+
+.inline-left {
+  @apply w-full py-2 pl-3 pr-2
+  rounded-t-[0.3rem] lg:rounded-tr-none lg:rounded-bl-[0.3rem];
 }

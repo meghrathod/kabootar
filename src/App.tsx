@@ -1,9 +1,10 @@
-import type { Component } from "solid-js";
 import { Route, Router, Routes } from "@solidjs/router";
+import { MetaProvider } from "@solidjs/meta";
+import type { Component } from "solid-js";
 
 import HomePage from "./pages/Home";
 import DiscoverPage from "./pages/Discover";
-import { MetaProvider } from "@solidjs/meta";
+import SharePage from "./pages/Share";
 
 const App: Component = () => {
   return (
@@ -13,6 +14,7 @@ const App: Component = () => {
           <Routes>
             <Route path="/" component={HomePage} />
             <Route path="/discover" component={DiscoverPage} />
+            <Route path="/share" component={SharePage} />
           </Routes>
         </Router>
       </main>
