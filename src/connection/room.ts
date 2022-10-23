@@ -2,24 +2,49 @@
 import { getPublicIP } from "./ip";
 import { baseURL, httpScheme, iceServers, wsScheme } from "../config";
 
-class Room {
+interface MasterEventDispatcher {
+  numClientsChanged(n: number);
+}
+
+interface ClientEventDispatcher {
+  receivePercentageChanged(percentage: number);
+  connectionStatusChanged(connected: boolean);
+  filenameChanged(name: string);
+}
+
+export type RoomEventDispatcher<Master extends boolean> = Master extends true
+  ? MasterEventDispatcher
+  : ClientEventDispatcher;
+
+class Room<Master extends boolean> {
   handler: MasterHandler | ClientHandler;
 
   private constructor(
-    public isMaster: boolean,
+    public isMaster: Master,
     public id: string,
     public name: string,
     public emoji: string,
     private ws: WebSocket,
     private clientKey: string,
+    public fileName: Master extends true ? string : undefined,
+    private eventDispatcher: RoomEventDispatcher<Master>,
     public pin?: string
   ) {
-    this.handler = isMaster ? new MasterHandler(ws) : new ClientHandler(ws);
+    this.handler = isMaster
+      ? new MasterHandler(
+          ws,
+          fileName,
+          eventDispatcher as RoomEventDispatcher<true>
+        )
+      : new ClientHandler(ws, eventDispatcher as RoomEventDispatcher<false>);
 
     ws.addEventListener("close", this.handleClose.bind(this));
   }
 
-  static async create(): Promise<Room | undefined> {
+  static async create(
+    fileName: string,
+    dispatcher: RoomEventDispatcher<true>
+  ): Promise<Room<true> | undefined> {
     const response = await fetch(`${httpScheme}${baseURL}/room`, {
       method: "POST",
       headers: {
@@ -32,25 +57,36 @@ class Room {
       await response.json();
 
     const ws = await this.initWS(roomID, masterKey, true);
-
     if (ws === undefined) {
       return undefined;
     }
-    return new Room(true, roomID, roomName, emoji, ws, clientKey, pin);
+
+    return new Room(
+      true,
+      roomID,
+      roomName,
+      emoji,
+      ws,
+      clientKey,
+      fileName,
+      dispatcher,
+      pin
+    );
   }
 
   static async joinDirect(
     id: string,
     key: string,
     name: string,
-    emoji: string
-  ) {
+    emoji: string,
+    dispatcher: RoomEventDispatcher<false>
+  ): Promise<Room<false> | undefined> {
     const ws = await this.initWS(id, key, false);
     if (ws === undefined) {
       return undefined;
     }
 
-    return new Room(false, id, name, emoji, ws, key);
+    return new Room(false, id, name, emoji, ws, key, undefined, dispatcher);
   }
 
   static async initWS(
@@ -116,7 +152,11 @@ const metaChannelLabel = "meta";
 class MasterHandler {
   clients: Map<string, MasterClient>;
 
-  constructor(private ws: WebSocket) {
+  constructor(
+    private ws: WebSocket,
+    private _fileName: string,
+    private dispatcher: RoomEventDispatcher<true>
+  ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.clients = new Map();
   }
@@ -159,6 +199,7 @@ class MasterHandler {
         }
       )
     );
+    this.dispatcher.numClientsChanged(this.clients.size);
   }
 
   private handleLeave(data: string[]) {
@@ -166,13 +207,14 @@ class MasterHandler {
       return;
     }
 
+    // TODO(AG): Perform cleanup
     const client = this.clients.get(data[1]);
     if (client) {
       client.close();
     }
 
     this.clients.delete(data[1]);
-    // TODO(AG): Perform cleanup
+    this.dispatcher.numClientsChanged(this.clients.size);
   }
 
   private handleSignalMessage(data: string[]) {
@@ -225,15 +267,6 @@ class MasterClient {
     this.makeOffer();
   }
 
-  private onIceCandidate(event: RTCPeerConnectionIceEvent) {
-    if (event.candidate) {
-      this.sendSignal(
-        this.id,
-        JSON.stringify([MasterClientSignal.TRICKLE_ICE, event.candidate])
-      );
-    }
-  }
-
   public handleSignal(signal: string) {
     try {
       const data = JSON.parse(signal);
@@ -250,6 +283,20 @@ class MasterClient {
           break;
       }
     } catch {}
+  }
+
+  close() {
+    this.closed = true;
+    this.pc.close();
+  }
+
+  private onIceCandidate(event: RTCPeerConnectionIceEvent) {
+    if (event.candidate) {
+      this.sendSignal(
+        this.id,
+        JSON.stringify([MasterClientSignal.TRICKLE_ICE, event.candidate])
+      );
+    }
   }
 
   private async handleAnswer(data: any[]) {
@@ -285,19 +332,18 @@ class MasterClient {
     this.metaOpen = false;
     this.close();
   }
-
-  close() {
-    this.closed = true;
-    this.pc.close();
-  }
 }
 
 class ClientHandler {
   private pc: RTCPeerConnection;
   private metaChannel: RTCDataChannel;
 
-  constructor(private ws: WebSocket) {
+  constructor(
+    private ws: WebSocket,
+    private dispatcher: RoomEventDispatcher<false>
+  ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
+    this.dispatcher.connectionStatusChanged(false);
 
     this.pc = new RTCPeerConnection({ ...iceServers });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
@@ -317,6 +363,7 @@ class ClientHandler {
   private onDataChannel(event: RTCDataChannelEvent) {
     if (event.channel.label === metaChannelLabel) {
       this.metaChannel = event.channel;
+      this.dispatcher.connectionStatusChanged(true);
     }
   }
 

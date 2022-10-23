@@ -8,8 +8,13 @@ import {
 import { useParams } from "@solidjs/router";
 
 import { emojiBackground } from "../utils/emoji";
-
 import Room from "../connection/room";
+
+// Signals
+export const roomSignal = createSignal<Room<boolean> | undefined>();
+export const numClientsSignal = createSignal(0);
+const connectedSignal = createSignal(false);
+const percentageSignal = createSignal(0);
 
 interface RoomDetailsProps {
   name: string;
@@ -166,6 +171,7 @@ const ClientFooter: Component<{ progress: number }> = (props) => {
 
 const MasterShare: Component = () => {
   const [url, setURL] = createSignal("");
+  const [numClients] = numClientsSignal;
 
   onMount(() => {
     setTimeout(() => {
@@ -176,7 +182,7 @@ const MasterShare: Component = () => {
   return (
     <>
       <LinkActions url={url()} />
-      <MasterFooter numPeers={3} />
+      <MasterFooter numPeers={numClients()} />
     </>
   );
 };
@@ -188,13 +194,16 @@ const ProgressBar: Component<{ progress: number }> = (props) => {
 };
 
 const ClientShare: Component = () => {
-  const percentage = 42;
+  const [connected] = connectedSignal;
+  const [percentage] = percentageSignal;
 
-  return (
+  return connected ? (
     <>
-      <ProgressBar progress={percentage} />
-      <ClientFooter progress={percentage} />
+      <ProgressBar progress={percentage()} />
+      <ClientFooter progress={percentage()} />
     </>
+  ) : (
+    <Connecting />
   );
 };
 
@@ -218,10 +227,12 @@ const Connecting: Component = () => {
   return <p>{`Connecting${dots()}`}</p>;
 };
 
-export const roomSignal = createSignal<Room | undefined>();
-
 const SharePage: Component = () => {
   const [room, setRoom] = roomSignal;
+  const [, setConnected] = connectedSignal;
+  const [, setPercentage] = percentageSignal;
+
+  const [filename, setFileName] = createSignal(room()?.fileName ?? undefined);
   const routerParams = useParams();
 
   onMount(async () => {
@@ -234,7 +245,17 @@ const SharePage: Component = () => {
       const name = params.get("n");
       const emoji = params.get("e");
 
-      const newRoom = await Room.joinDirect(id, key, name, emoji);
+      const newRoom = await Room.joinDirect(id, key, name, emoji, {
+        filenameChanged(name: string) {
+          setFileName(name);
+        },
+        connectionStatusChanged(connected: boolean) {
+          setConnected(connected);
+        },
+        receivePercentageChanged(percentage: number) {
+          setPercentage(percentage);
+        },
+      });
       if (newRoom !== undefined) {
         setRoom(newRoom);
       }
@@ -262,7 +283,7 @@ const SharePage: Component = () => {
               name={room().name}
               pin={room().pin}
               emoji={room().emoji}
-              fileName="movie.mp4" // TODO(AG): Make this dynamic, or remove this
+              fileName={filename()} // TODO(AG): Make this dynamic, or remove this
             />
             {room().isMaster ? <MasterShare /> : <ClientShare />}
           </>
