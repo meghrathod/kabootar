@@ -10,6 +10,7 @@ interface ClientEventDispatcher {
   receivePercentageChanged(percentage: number);
   connectionStatusChanged(connected: boolean);
   filenameChanged(name: string);
+  connectionSpeed(speed: number);
 }
 
 export type RoomEventDispatcher<Master extends boolean> = Master extends true
@@ -349,7 +350,7 @@ class MasterClient {
     );
   }
 
-  private async sendMetadata() {
+  private sendMetadata() {
     const message = JSON.stringify([this.file.name, this.file.size]);
 
     const buf = new ArrayBuffer(message.length);
@@ -364,11 +365,10 @@ class MasterClient {
   private onBufferedAmountLow(_event: Event) {
     // Send queue cleared
     this.dataChannel.onbufferedamountlow = undefined;
-    // noinspection JSIgnoredPromiseFromCall
     this.sendFile();
   }
 
-  private async sendFile() {
+  private sendFile() {
     const fileReader = new FileReader();
 
     // TODO(AG): Handle other events
@@ -398,11 +398,11 @@ class MasterClient {
     readChunk(this.offset);
   }
 
-  private async dataChannelOpen(_event: Event) {
+  private dataChannelOpen(_event: Event) {
     this.channelOpen = true;
     this.offset = 0;
-    await this.sendMetadata();
-    await this.sendFile();
+    this.sendMetadata();
+    this.sendFile();
   }
 
   private metaChannelClose(_event: Event) {
@@ -479,11 +479,29 @@ class ClientHandler {
     this.metadata = { name, size };
     this.dispatcher.filenameChanged(name);
     this.received = 0;
+    this.lastSpeedSampleTime = Date.now();
+    this.lastSampleReceived = 0;
+    this.speed = 0;
   }
+
+  private lastSpeedSampleTime: number;
+  private lastSampleReceived: number;
+  private speed: number;
 
   private handleChunk(chunk: Uint8Array) {
     this.fileChunks.push(chunk);
     this.received += chunk.length;
+
+    const now = Date.now();
+    // Sample the speed every 1s
+    if (now > this.lastSpeedSampleTime + 1000) {
+      this.speed =
+        ((this.received - this.lastSampleReceived) * 1000) /
+        (now - this.lastSpeedSampleTime);
+      this.lastSampleReceived = this.received;
+      this.lastSpeedSampleTime = now;
+      this.dispatcher.connectionSpeed(this.speed);
+    }
 
     this.dispatcher.receivePercentageChanged(
       Math.floor((this.received * 100) / this.metadata.size)

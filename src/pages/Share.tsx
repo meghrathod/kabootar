@@ -15,6 +15,7 @@ export const roomSignal = createSignal<Room<boolean> | undefined>();
 export const numClientsSignal = createSignal(0);
 const connectedSignal = createSignal(false);
 const percentageSignal = createSignal(0);
+const speedSignal = createSignal(0);
 
 interface RoomDetailsProps {
   name: string;
@@ -162,9 +163,24 @@ const MasterFooter: Component<{ numPeers: number }> = (props) => {
 };
 
 const ClientFooter: Component<{ progress: number }> = (props) => {
+  const [speed] = speedSignal;
+
+  const readableSpeed = () => {
+    let s = speed();
+
+    if (s < 1024) {
+      return `${s} B`;
+    } else if (s < 1024 * 1024) {
+      return `${(s / 1024).toFixed(2)} KiB`;
+    }
+
+    return `${(s / (1024 * 1024)).toFixed(2)} MiB`;
+  };
+
   return (
     <p>
-      <span class="font-bold">Receiving:</span> {props.progress}%
+      <span class="font-bold">Receiving:</span> {props.progress}% @{" "}
+      {readableSpeed()}/s
     </p>
   );
 };
@@ -231,6 +247,7 @@ const SharePage: Component = () => {
   const [room, setRoom] = roomSignal;
   const [, setConnected] = connectedSignal;
   const [, setPercentage] = percentageSignal;
+  const [, setSpeed] = speedSignal;
 
   const [filename, setFileName] = createSignal(room()?.file.name ?? undefined);
   const routerParams = useParams();
@@ -254,6 +271,9 @@ const SharePage: Component = () => {
         },
         receivePercentageChanged(percentage: number) {
           setPercentage(percentage);
+        },
+        connectionSpeed(speed: number) {
+          setSpeed(speed);
         },
       });
       if (newRoom !== undefined) {
