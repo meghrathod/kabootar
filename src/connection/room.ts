@@ -242,13 +242,7 @@ enum ClientMasterSignal {
   TRICKLE_ICE,
 }
 
-enum FileChannelHeader {
-  METADATA,
-  CHUNK,
-  DONE,
-}
-
-const chunkSize = 15 * 1024; // 15 KiB
+const chunkSize = 16 * 1024; // 15 KiB
 
 class MasterClient {
   private channelOpen: boolean;
@@ -281,7 +275,7 @@ class MasterClient {
     this.dataChannel = this.pc.createDataChannel(channelLabel, {
       ordered: true,
     });
-    this.dataChannel.addEventListener("open", this.metaChannelOpen.bind(this));
+    this.dataChannel.addEventListener("open", this.dataChannelOpen.bind(this));
     this.dataChannel.addEventListener(
       "close",
       this.metaChannelClose.bind(this)
@@ -356,58 +350,59 @@ class MasterClient {
   }
 
   private async sendMetadata() {
-    const digest = await crypto.subtle.digest(
-      "SHA-512",
-      await this.file.arrayBuffer()
-    );
-
     const message = JSON.stringify([this.file.name, this.file.size]);
 
-    const buf = new ArrayBuffer(message.length + 65);
+    const buf = new ArrayBuffer(message.length);
     const view = new Uint8Array(buf);
-    view.set([FileChannelHeader.METADATA], 0);
-    view.set(new Uint8Array(digest), 1);
-    view.set(new TextEncoder().encode(message), 65);
+    view.set(new TextEncoder().encode(message), 0);
 
     this.dataChannel.send(buf);
+  }
+
+  private offset: number;
+
+  private onBufferedAmountLow(_event: Event) {
+    // Send queue cleared
+    this.dataChannel.onbufferedamountlow = undefined;
+    // noinspection JSIgnoredPromiseFromCall
+    this.sendFile();
   }
 
   private async sendFile() {
-    const fileSize = this.file.size;
+    const fileReader = new FileReader();
 
-    let sent = 0;
-    let chunkNum = 0;
-    while (sent < fileSize) {
-      const end = sent + chunkSize > fileSize ? fileSize : sent + chunkSize;
-      await this.sendFileChunk(chunkNum, this.file.slice(sent, end));
-      chunkNum++;
-      sent = end;
-    }
+    // TODO(AG): Handle other events
+    fileReader.addEventListener("load", (event) => {
+      this.dataChannel.send(event.target.result as ArrayBuffer);
+      this.offset += (event.target.result as ArrayBuffer).byteLength;
+
+      if (this.offset < this.file.size) {
+        if (
+          this.dataChannel.bufferedAmount <=
+          this.dataChannel.bufferedAmountLowThreshold
+        ) {
+          readChunk(this.offset);
+        } else {
+          // Backpressure
+          this.dataChannel.onbufferedamountlow =
+            this.onBufferedAmountLow.bind(this);
+        }
+      } else {
+        // File reading complete
+      }
+    });
+
+    const readChunk = (offset) => {
+      fileReader.readAsArrayBuffer(this.file.slice(offset, offset + chunkSize));
+    };
+    readChunk(this.offset);
   }
 
-  private async sendFileChunk(chunkNum: number, chunk: Blob) {
-    const buf = new ArrayBuffer(chunk.size + 5);
-    const view = new Uint8Array(buf);
-    view.set([FileChannelHeader.CHUNK], 0);
-    view.set(new Uint32Array([chunkNum]), 1);
-    view.set(new Uint8Array(await chunk.arrayBuffer()), 5);
-
-    this.dataChannel.send(buf);
-  }
-
-  private sendDone() {
-    const buf = new ArrayBuffer(1);
-    const view = new Uint8Array(buf);
-    view.set([FileChannelHeader.DONE]);
-
-    this.dataChannel.send(buf);
-  }
-
-  private async metaChannelOpen(_event: Event) {
+  private async dataChannelOpen(_event: Event) {
     this.channelOpen = true;
+    this.offset = 0;
     await this.sendMetadata();
     await this.sendFile();
-    this.sendDone();
   }
 
   private metaChannelClose(_event: Event) {
@@ -419,7 +414,6 @@ class MasterClient {
 interface FileMetadata {
   name: string;
   size: number;
-  digest: Uint8Array;
 }
 
 class ClientHandler {
@@ -455,6 +449,7 @@ class ClientHandler {
   private onDataChannel(event: RTCDataChannelEvent) {
     if (event.channel.label === channelLabel) {
       this.dataChannel = event.channel;
+      this.dataChannel.binaryType = "arraybuffer";
       this.dataChannel.addEventListener(
         "message",
         this.onDataChannelMessage.bind(this)
@@ -463,75 +458,50 @@ class ClientHandler {
     }
   }
 
-  private async onDataChannelMessage(event: MessageEvent<Blob>) {
+  private onDataChannelMessage(event: MessageEvent<ArrayBuffer>) {
     try {
-      const buf = await event.data.arrayBuffer();
+      const buf = event.data;
       const view = new Uint8Array(buf);
 
-      switch (view[0]) {
-        case FileChannelHeader.METADATA:
-          this.handleMetadata(view);
-          break;
-
-        case FileChannelHeader.CHUNK:
-          const num = new Uint32Array(view.slice(1, 5));
-          this.handleChunk(num[0], view.slice(5));
-          break;
-
-        case FileChannelHeader.DONE:
-          await this.handleEnd();
-          break;
+      if (!this.metadata) {
+        this.handleMetadata(view);
+      } else {
+        this.handleChunk(view);
       }
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   private handleMetadata(view: Uint8Array) {
-    const digest = view.slice(1);
-    const [name, size] = JSON.parse(new TextDecoder().decode(view.slice(65)));
-    this.fileChunks = new Array(Math.ceil(size / chunkSize));
-    this.metadata = { name, size, digest };
+    const [name, size] = JSON.parse(new TextDecoder().decode(view));
+    this.fileChunks = [];
+    this.metadata = { name, size };
     this.dispatcher.filenameChanged(name);
     this.received = 0;
   }
 
-  private handleChunk(num: number, chunk: Uint8Array) {
-    this.fileChunks[num] = chunk;
+  private handleChunk(chunk: Uint8Array) {
+    this.fileChunks.push(chunk);
     this.received += chunk.length;
 
     this.dispatcher.receivePercentageChanged(
       Math.floor((this.received * 100) / this.metadata.size)
     );
+
+    if (this.received === this.metadata.size) {
+      this.handleEnd();
+    }
   }
 
-  private async handleEnd() {
+  private handleEnd() {
     const blob = new Blob(this.fileChunks);
-
-    const digest = await crypto.subtle.digest(
-      "SHA-512",
-      await blob.arrayBuffer()
-    );
-    const digestView = new Uint8Array(digest);
-
-    if (!this.compareDigest(digestView, this.metadata.digest)) {
-      // TODO(AG): Handle error
-      return;
-    }
 
     const a = document.createElement("a");
     a.download = this.metadata.name;
     a.href = URL.createObjectURL(blob);
 
     a.click();
-  }
-
-  private compareDigest(a: Uint8Array, b: Uint8Array): boolean {
-    for (let i = 0; i < 64; i++) {
-      if (a[i] !== b[i]) {
-        return false;
-      }
-    }
-
-    return true;
   }
 
   private handleMessage(event: MessageEvent) {
