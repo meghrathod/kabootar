@@ -43,7 +43,7 @@ const Header: Component<HeaderProps> = (props) => {
       class="
         flex
         flex-col items-start gap-4
-        lg:flex-row lg:justify-between lg:items-center
+        md:flex-row md:justify-between md:items-center
       "
     >
       <RoomDetails {...props} />
@@ -97,14 +97,14 @@ const LinkActions: Component<{ url: string }> = (props) => {
 
   return (
     <div class="flex flex-col gap-[14px] w-full">
-      <div class="flex flex-col lg:flex-row lg:gap-0 w-full">
+      <div class="flex flex-col md:flex-row md:gap-0 w-full">
         <div
           class="overflow-hidden inline-left"
           style={{
             background: "rgba(0, 0, 0, 0.25)",
           }}
         >
-          <p class="text-ellipsis overflow-hidden">{props.url}</p>
+          <p class="text-ellipsis line-clamp-1 overflow-hidden">{props.url}</p>
         </div>
         <button class="button-inline-right" onClick={copyURL}>
           <svg
@@ -118,7 +118,7 @@ const LinkActions: Component<{ url: string }> = (props) => {
           Copy URL
         </button>
       </div>
-      <div class="flex flex-col lg:flex-row gap-[14px]">
+      <div class="flex flex-col md:flex-row gap-[14px]">
         {shareAvailable && (
           <LinkActionButton onClick={shareURL}>
             <svg
@@ -251,7 +251,7 @@ const SharePage: Component = () => {
   return (
     <div class="w-full h-full flex items-center justify-center px-8 background-goo-vignette">
       <div
-        class="shadow-xl p-[28px] rounded-lg w-full lg:w-[600px] flex flex-col gap-[28px]"
+        class="shadow-xl p-[28px] rounded-lg w-full md:w-[600px] flex flex-col gap-[28px]"
         style={{
           background: "rgba(0, 0, 0, 0.5)",
         }}

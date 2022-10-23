@@ -1,5 +1,6 @@
+// skipcq: JS-0108
 import { getPublicIP } from "./ip";
-import { baseURL, httpScheme, wsScheme } from "../config";
+import { baseURL, httpScheme, iceServers, wsScheme } from "../config";
 
 class Room {
   handler: MasterHandler | ClientHandler;
@@ -10,12 +11,10 @@ class Room {
     public name: string,
     public emoji: string,
     private ws: WebSocket,
-    private clientKey?: string,
+    private clientKey: string,
     public pin?: string
   ) {
-    this.handler = isMaster
-      ? new MasterHandler(ws, clientKey!)
-      : new ClientHandler(ws);
+    this.handler = isMaster ? new MasterHandler(ws) : new ClientHandler(ws);
 
     ws.addEventListener("close", this.handleClose.bind(this));
   }
@@ -51,7 +50,7 @@ class Room {
       return undefined;
     }
 
-    return new Room(false, id, name, emoji, ws);
+    return new Room(false, id, name, emoji, ws, key);
   }
 
   static async initWS(
@@ -112,9 +111,14 @@ class Room {
   }
 }
 
+const metaChannelLabel = "meta";
+
 class MasterHandler {
-  constructor(private ws: WebSocket, private _clientKey: string) {
+  clients: Map<String, MasterClient>;
+
+  constructor(private ws: WebSocket) {
     ws.addEventListener("message", this.handleMessage.bind(this));
+    this.clients = new Map();
   }
 
   goodbye() {}
@@ -125,27 +129,205 @@ class MasterHandler {
 
       switch (data[0]) {
         case "0":
-          // Join
+          this.handleJoin(data);
           break;
 
         case "1":
-          // Leave
+          this.handleLeave(data);
           break;
 
         case "2":
-          // Message
+          this.handleSignalMessage(data);
           break;
       }
     } catch {}
+  }
+
+  private handleJoin(data: string[]) {
+    if (data.length < 2) {
+      return;
+    }
+    this.clients.set(
+      data[1],
+      new MasterClient(
+        data[1],
+        (id, signal) => {
+          this.ws.send(JSON.stringify(["0", id, signal]));
+        },
+        () => {
+          // TODO(AG): Handle closure
+        }
+      )
+    );
+  }
+
+  private handleLeave(data: string[]) {
+    if (data.length < 2) {
+      return;
+    }
+
+    const client = this.clients.get(data[1]);
+    if (client) {
+      client.remoteClose();
+    }
+
+    this.clients.delete(data[1]);
+    // TODO(AG): Perform cleanup
+  }
+
+  private handleSignalMessage(data: string[]) {
+    if (data.length < 3) {
+      return;
+    }
+
+    const [_, id, message] = data;
+    const client = this.clients.get(id);
+    if (client) {
+      client.handleSignal(message);
+    }
+  }
+}
+
+enum MasterClientSignal {
+  OFFER,
+  TRICKLE_ICE,
+}
+
+enum ClientMasterSignal {
+  ANSWER,
+  TRICKLE_ICE,
+}
+
+class MasterClient {
+  closed: boolean;
+
+  pc: RTCPeerConnection;
+  metaChannel: RTCDataChannel;
+
+  constructor(
+    private id: string,
+    private sendSignal: (id: string, signal: string) => void,
+    private _onClose: () => void
+  ) {
+    this.closed = false;
+
+    this.pc = new RTCPeerConnection({ ...iceServers });
+    this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
+
+    this.metaChannel = this.pc.createDataChannel(metaChannelLabel);
+    this.metaChannel.addEventListener("open", this.metaChannelOpen.bind(this));
+    this.metaChannel.addEventListener(
+      "close",
+      this.metaChannelClose.bind(this)
+    );
+    // noinspection JSIgnoredPromiseFromCall
+    this.makeOffer();
+  }
+
+  private onIceCandidate(event: RTCPeerConnectionIceEvent) {
+    if (event.candidate) {
+      this.sendSignal(
+        this.id,
+        JSON.stringify([MasterClientSignal.TRICKLE_ICE, event.candidate])
+      );
+    }
+  }
+
+  public handleSignal(signal: string) {
+    try {
+      const data = JSON.parse(signal);
+
+      switch (data[0]) {
+        case ClientMasterSignal.ANSWER:
+          console.log("Answer:", data[1]);
+          // noinspection JSIgnoredPromiseFromCall
+          this.handleAnswer(data);
+          break;
+
+        case ClientMasterSignal.TRICKLE_ICE:
+          console.log("Trickle ICE:", data[1]);
+          // noinspection JSIgnoredPromiseFromCall
+          this.handleTrickleIce(data);
+          break;
+      }
+    } catch {}
+  }
+
+  private async handleAnswer(data: any[]) {
+    if (data.length < 2) {
+      return;
+    }
+
+    await this.pc.setRemoteDescription(data[1]);
+  }
+
+  private async handleTrickleIce(data: any[]) {
+    if (data.length < 2) {
+      return;
+    }
+
+    await this.pc.addIceCandidate(data[1]);
+  }
+
+  private async makeOffer() {
+    const offer = await this.pc.createOffer();
+    await this.pc.setLocalDescription(offer);
+    this.sendSignal(
+      this.id,
+      JSON.stringify([MasterClientSignal.OFFER, this.pc.localDescription])
+    );
+  }
+
+  private metaChannelOpen(_event: Event) {
+    console.log("Open!");
+  }
+
+  private metaChannelClose(_event: Event) {
+    console.log("Closed");
+  }
+
+  remoteClose() {
+    this.closed = true;
+    this.pc.close();
   }
 }
 
 class ClientHandler {
+  private pc: RTCPeerConnection;
+  private metaChannel: RTCDataChannel;
+
   constructor(private ws: WebSocket) {
     ws.addEventListener("message", this.handleMessage.bind(this));
+
+    this.pc = new RTCPeerConnection({ ...iceServers });
+    this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
+    this.pc.addEventListener(
+      "connectionstatechange",
+      this.onConnectionStateChange.bind(this)
+    );
+    this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
   }
 
   goodbye() {}
+
+  private onIceCandidate(event: RTCPeerConnectionIceEvent) {
+    if (event.candidate) {
+      this.sendSignal(
+        JSON.stringify([ClientMasterSignal.TRICKLE_ICE, event.candidate])
+      );
+    }
+  }
+
+  private onConnectionStateChange(_event: Event) {
+    console.log("Connection state:", this.pc.connectionState);
+  }
+
+  private async onDataChannel(event: RTCDataChannelEvent) {
+    if (event.channel.label === metaChannelLabel) {
+      this.metaChannel = event.channel;
+      console.log("New data channel:", event.channel);
+    }
+  }
 
   private handleMessage(event: MessageEvent) {
     try {
@@ -153,15 +335,64 @@ class ClientHandler {
 
       switch (data[0]) {
         case "0":
-          // Message
+          this.handleSignalMessage(data);
           break;
 
         case "1":
-          // Gone
+          this.handleGone(data);
           break;
       }
     } catch {}
   }
+
+  private handleSignalMessage(data: string[]) {
+    if (data.length < 2) {
+      return;
+    }
+
+    const peerMessage = JSON.parse(data[1]);
+
+    switch (peerMessage[0]) {
+      case MasterClientSignal.OFFER:
+        console.log("Remote offer", peerMessage[1]);
+        // noinspection JSIgnoredPromiseFromCall
+        this.handleOffer(peerMessage);
+        break;
+
+      case MasterClientSignal.TRICKLE_ICE:
+        console.log("Remote trickle", peerMessage[1]);
+        // noinspection JSIgnoredPromiseFromCall
+        this.handleTrickleIce(peerMessage);
+        break;
+    }
+  }
+
+  private async handleTrickleIce(data: any[]) {
+    if (data.length < 2) {
+      return;
+    }
+
+    await this.pc.addIceCandidate(data[1]);
+  }
+
+  private async handleOffer(data: any[]) {
+    if (data.length < 2) {
+      return;
+    }
+
+    await this.pc.setRemoteDescription(data[1]);
+    const answer = await this.pc.createAnswer();
+    await this.pc.setLocalDescription(answer);
+    this.sendSignal(
+      JSON.stringify([ClientMasterSignal.ANSWER, this.pc.localDescription])
+    );
+  }
+
+  private sendSignal(message: string) {
+    this.ws.send(JSON.stringify(["0", message]));
+  }
+
+  private handleGone(_data: string[]) {}
 }
 
 async function getDiscoveryParams() {

@@ -1,7 +1,6 @@
 import { iceServers } from "../config";
 
-const publicIPRegex =
-  /(\d+)(?<!10)\.(\d+)(?<!192\.168)(?<!172\.(1[6-9]|2\d|3[0-1]))\.(\d+)\.(\d+)/;
+const ipRegex = /\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}/;
 
 export function getPublicIP(): Promise<string> {
   return new Promise(async (resolve, reject) => {
@@ -9,9 +8,15 @@ export function getPublicIP(): Promise<string> {
 
     let address: string | undefined;
     pc.addEventListener("icecandidate", (event) => {
-      const addr = event.candidate?.address ?? "";
-      if (publicIPRegex.test(addr)) {
-        address = addr;
+      if (!event.candidate) {
+        return;
+      }
+
+      if (ipRegex.test(event.candidate.candidate)) {
+        const [ip] = ipRegex.exec(event.candidate.candidate);
+        if (isPublicIP(ip)) {
+          address = ip;
+        }
       }
     });
 
@@ -29,4 +34,28 @@ export function getPublicIP(): Promise<string> {
     pc.createDataChannel("dummy");
     await pc.setLocalDescription(await pc.createOffer());
   });
+}
+
+function isPublicIP(ip: string): boolean {
+  if (ip.startsWith("10.")) {
+    return false;
+  }
+
+  if (ip.startsWith("192.168.")) {
+    return false;
+  }
+
+  if (ip.startsWith("172.")) {
+    const [_, b] = ip.split(".");
+    try {
+      const bNum = Number.parseInt(b);
+      if (bNum >= 16 && bNum < 32) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
 }
