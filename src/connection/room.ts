@@ -114,7 +114,7 @@ class Room {
 const metaChannelLabel = "meta";
 
 class MasterHandler {
-  clients: Map<String, MasterClient>;
+  clients: Map<string, MasterClient>;
 
   constructor(private ws: WebSocket) {
     ws.addEventListener("message", this.handleMessage.bind(this));
@@ -168,7 +168,7 @@ class MasterHandler {
 
     const client = this.clients.get(data[1]);
     if (client) {
-      client.remoteClose();
+      client.close();
     }
 
     this.clients.delete(data[1]);
@@ -199,6 +199,7 @@ enum ClientMasterSignal {
 }
 
 class MasterClient {
+  metaOpen: boolean;
   closed: boolean;
 
   pc: RTCPeerConnection;
@@ -239,13 +240,11 @@ class MasterClient {
 
       switch (data[0]) {
         case ClientMasterSignal.ANSWER:
-          console.log("Answer:", data[1]);
           // noinspection JSIgnoredPromiseFromCall
           this.handleAnswer(data);
           break;
 
         case ClientMasterSignal.TRICKLE_ICE:
-          console.log("Trickle ICE:", data[1]);
           // noinspection JSIgnoredPromiseFromCall
           this.handleTrickleIce(data);
           break;
@@ -279,14 +278,15 @@ class MasterClient {
   }
 
   private metaChannelOpen(_event: Event) {
-    console.log("Open!");
+    this.metaOpen = true;
   }
 
   private metaChannelClose(_event: Event) {
-    console.log("Closed");
+    this.metaOpen = false;
+    this.close();
   }
 
-  remoteClose() {
+  close() {
     this.closed = true;
     this.pc.close();
   }
@@ -301,10 +301,6 @@ class ClientHandler {
 
     this.pc = new RTCPeerConnection({ ...iceServers });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
-    this.pc.addEventListener(
-      "connectionstatechange",
-      this.onConnectionStateChange.bind(this)
-    );
     this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
   }
 
@@ -318,14 +314,9 @@ class ClientHandler {
     }
   }
 
-  private onConnectionStateChange(_event: Event) {
-    console.log("Connection state:", this.pc.connectionState);
-  }
-
-  private async onDataChannel(event: RTCDataChannelEvent) {
+  private onDataChannel(event: RTCDataChannelEvent) {
     if (event.channel.label === metaChannelLabel) {
       this.metaChannel = event.channel;
-      console.log("New data channel:", event.channel);
     }
   }
 
@@ -354,13 +345,11 @@ class ClientHandler {
 
     switch (peerMessage[0]) {
       case MasterClientSignal.OFFER:
-        console.log("Remote offer", peerMessage[1]);
         // noinspection JSIgnoredPromiseFromCall
         this.handleOffer(peerMessage);
         break;
 
       case MasterClientSignal.TRICKLE_ICE:
-        console.log("Remote trickle", peerMessage[1]);
         // noinspection JSIgnoredPromiseFromCall
         this.handleTrickleIce(peerMessage);
         break;
