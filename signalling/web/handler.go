@@ -45,6 +45,7 @@ func (h *handler) makeDiscoverable(ip string, room *Room) {
 	}
 
 	rooms[room] = struct{}{}
+	room.DiscoveryIP = ip
 	h.notifyDiscoveryClients(ip, true, room)
 }
 
@@ -123,35 +124,34 @@ func (h *handler) joinRoom(
 		}
 
 		room.Master = conn
-	} else {
-		if room.CKey != key {
-			return false, ""
-		}
-
-		if room.Master == nil {
-			return false, ""
-		}
-
-		clientID, err := util.GenerateRandomString(8)
-		if err != nil {
-			return false, ""
-		}
-
-		msg, err := MarshalSMsg(&ProtoSMJoinedPayload{ClientID: clientID})
-		if err != nil {
-			return false, ""
-		}
-
-		err = room.Master.WriteMessage(1, msg)
-		if err != nil {
-			return false, ""
-		}
-
-		room.Clients.Store(clientID, conn)
-		return true, clientID
+		return true, ""
 	}
 
-	return true, ""
+	if room.CKey != key {
+		return false, ""
+	}
+
+	if room.Master == nil {
+		return false, ""
+	}
+
+	clientID, err := util.GenerateRandomString(8)
+	if err != nil {
+		return false, ""
+	}
+
+	msg, err := MarshalSMsg(&ProtoSMJoinedPayload{ClientID: clientID})
+	if err != nil {
+		return false, ""
+	}
+
+	err = room.Master.WriteMessage(1, msg)
+	if err != nil {
+		return false, ""
+	}
+
+	room.Clients.Store(clientID, conn)
+	return true, clientID
 }
 
 func (h *handler) leaveRoom(

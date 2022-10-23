@@ -14,7 +14,7 @@ const App: Component = () => {
           <Routes>
             <Route path="/" component={HomePage} />
             <Route path="/discover" component={DiscoverPage} />
-            <Route path="/share" component={SharePage} />
+            <Route path="/:id" component={SharePage} />
           </Routes>
         </Router>
       </main>

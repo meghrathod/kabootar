@@ -2,15 +2,23 @@ import { getPublicIP } from "./ip";
 import { baseURL, httpScheme, wsScheme } from "../config";
 
 class Room {
+  handler: MasterHandler | ClientHandler;
+
   private constructor(
     public isMaster: boolean,
-    private id: string,
+    public id: string,
     public name: string,
     public emoji: string,
     private ws: WebSocket,
     private clientKey?: string,
     public pin?: string
-  ) {}
+  ) {
+    this.handler = isMaster
+      ? new MasterHandler(ws, clientKey!)
+      : new ClientHandler(ws);
+
+    ws.addEventListener("close", this.handleClose.bind(this));
+  }
 
   static async create(): Promise<Room | undefined> {
     const response = await fetch(`${httpScheme}${baseURL}/room`, {
@@ -32,8 +40,18 @@ class Room {
     return new Room(true, roomID, roomName, emoji, ws, clientKey, pin);
   }
 
-  static async joinDirect(id: string, key: string, emoji: string) {
-    // const ws = new WebSocket()
+  static async joinDirect(
+    id: string,
+    key: string,
+    name: string,
+    emoji: string
+  ) {
+    const ws = await this.initWS(id, key, false);
+    if (ws === undefined) {
+      return undefined;
+    }
+
+    return new Room(false, id, name, emoji, ws);
   }
 
   static async initWS(
@@ -50,6 +68,7 @@ class Room {
         ws.removeEventListener("close", close);
         resolve(false);
       }
+
       ws.addEventListener("close", close);
 
       function message(event: MessageEvent) {
@@ -65,6 +84,7 @@ class Room {
           ws.removeEventListener("message", message);
         }
       }
+
       ws.addEventListener("message", message);
     });
 
@@ -77,6 +97,70 @@ class Room {
     }
 
     return undefined;
+  }
+
+  constructHash() {
+    return `k=${this.clientKey}&n=${this.name}&e=${this.emoji}`;
+  }
+
+  close() {
+    this.ws.close();
+  }
+
+  private handleClose(_event: CloseEvent) {
+    this.handler.goodbye();
+  }
+}
+
+class MasterHandler {
+  constructor(private ws: WebSocket, private _clientKey: string) {
+    ws.addEventListener("message", this.handleMessage.bind(this));
+  }
+
+  goodbye() {}
+
+  private handleMessage(event: MessageEvent) {
+    try {
+      const data = JSON.parse(event.data);
+
+      switch (data[0]) {
+        case "0":
+          // Join
+          break;
+
+        case "1":
+          // Leave
+          break;
+
+        case "2":
+          // Message
+          break;
+      }
+    } catch {}
+  }
+}
+
+class ClientHandler {
+  constructor(private ws: WebSocket) {
+    ws.addEventListener("message", this.handleMessage.bind(this));
+  }
+
+  goodbye() {}
+
+  private handleMessage(event: MessageEvent) {
+    try {
+      const data = JSON.parse(event.data);
+
+      switch (data[0]) {
+        case "0":
+          // Message
+          break;
+
+        case "1":
+          // Gone
+          break;
+      }
+    } catch {}
   }
 }
 

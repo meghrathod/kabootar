@@ -1,14 +1,19 @@
-import { type Component, JSX } from "solid-js";
+import {
+  type Component,
+  createSignal,
+  JSX,
+  onCleanup,
+  onMount,
+} from "solid-js";
+import { useParams } from "@solidjs/router";
 
 import { emojiBackground } from "../utils/emoji";
 
-import BlobImage from "../static/blob.svg";
-
-const emoji = "🍆";
+import Room from "../connection/room";
 
 interface RoomDetailsProps {
   name: string;
-  pin: string;
+  pin?: string;
   emoji: string;
 }
 
@@ -22,7 +27,7 @@ const RoomDetails: Component<RoomDetailsProps> = (props) => {
         <p class="text-xl font-bold overflow-ellipsis line-clamp-1">
           {props.name}
         </p>
-        <p class="mt-[-0.4rem]">{props.pin}</p>
+        {props.pin && <p class="mt-[-0.4rem]">{props.pin}</p>}
       </div>
     </div>
   );
@@ -160,11 +165,17 @@ const ClientFooter: Component<{ progress: number }> = (props) => {
 };
 
 const MasterShare: Component = () => {
-  const url = window.location.href;
+  const [url, setURL] = createSignal("");
+
+  onMount(() => {
+    setTimeout(() => {
+      setURL(window.location.href);
+    }, 1);
+  });
 
   return (
     <>
-      <LinkActions url={url} />
+      <LinkActions url={url()} />
       <MasterFooter numPeers={3} />
     </>
   );
@@ -187,32 +198,77 @@ const ClientShare: Component = () => {
   );
 };
 
+const Connecting: Component = () => {
+  // noinspection DuplicatedCode
+  const [timer, setTimer] = createSignal(-1);
+  const [dots, setDots] = createSignal("");
+
+  onMount(() => {
+    setTimer(
+      setInterval(() => {
+        setDots(dots().length === 3 ? "" : `${dots()}.`);
+      }, 200)
+    );
+  });
+
+  onCleanup(() => {
+    clearInterval(timer());
+  });
+
+  return <p>{`Connecting${dots()}`}</p>;
+};
+
+export const roomSignal = createSignal<Room | undefined>();
+
 const SharePage: Component = () => {
-  const masterShare = false;
+  const [room, setRoom] = roomSignal;
+  const routerParams = useParams();
+
+  onMount(async () => {
+    if (room() === undefined) {
+      const hash = `?${window.location.hash.slice(1)}`;
+      const params = new URLSearchParams(hash);
+
+      const id = routerParams.id;
+      const key = params.get("k");
+      const name = params.get("n");
+      const emoji = params.get("e");
+
+      const newRoom = await Room.joinDirect(id, key, name, emoji);
+      if (newRoom !== undefined) {
+        setRoom(newRoom);
+      }
+    }
+  }); // TODO(AG): Handle errors
+
+  onCleanup(() => {
+    if (room() !== undefined) {
+      room().close();
+      setRoom(undefined);
+    }
+  });
 
   return (
-    <div
-      class="w-full h-full flex items-center justify-center px-8"
-      style={{
-        "background-image": `url(${BlobImage})`,
-        "background-position": "center",
-        "background-size": "cover",
-        "background-repeat": "no-repeat",
-      }}
-    >
+    <div class="w-full h-full flex items-center justify-center px-8 background-goo-vignette">
       <div
         class="shadow-xl p-[28px] rounded-lg w-full lg:w-[600px] flex flex-col gap-[28px]"
         style={{
           background: "rgba(0, 0, 0, 0.5)",
         }}
       >
-        <Header
-          name="Sinister Shelf"
-          pin="192873"
-          emoji={emoji}
-          fileName="movie.mp4"
-        />
-        {masterShare ? <MasterShare /> : <ClientShare />}
+        {room() !== undefined ? (
+          <>
+            <Header
+              name={room().name}
+              pin={room().pin}
+              emoji={room().emoji}
+              fileName="movie.mp4" // TODO(AG): Make this dynamic, or remove this
+            />
+            {room().isMaster ? <MasterShare /> : <ClientShare />}
+          </>
+        ) : (
+          <Connecting />
+        )}
       </div>
     </div>
   );

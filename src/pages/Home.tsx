@@ -4,14 +4,18 @@ import { Component, createSignal } from "solid-js";
 
 import { PrimaryButton, SexyButton } from "../components/Button";
 import Room from "../connection/room";
+import { roomSignal } from "./Share";
 
 const HomePage: Component = () => {
   const navigate = useNavigate();
   const [shareDisabled, setShareDisabled] = createSignal(false);
+  const [_, setRoom] = roomSignal;
 
   const createRoom = async () => {
     setShareDisabled(true);
-    await Room.create();
+    const room = await Room.create();
+    setRoom(room);
+    navigate(`/${room.id}#${room.constructHash()}`);
     setShareDisabled(false);
   };
 

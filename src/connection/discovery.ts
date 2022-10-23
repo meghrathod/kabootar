@@ -13,6 +13,24 @@ class Discovery {
     ws.addEventListener("close", this.closeListener.bind(this));
   }
 
+  static async connect(
+    added: (room: DiscoveredRoomItem) => void,
+    removed: (id: string) => void
+  ): Promise<Discovery | undefined> {
+    try {
+      const ip = await getPublicIP();
+      const ws = new WebSocket(`${wsScheme}${baseURL}/discover?ip=${ip}`);
+
+      return new Discovery(ws, added, removed);
+    } catch {
+      return;
+    }
+  }
+
+  close() {
+    this.ws.close();
+  }
+
   private messageListener(event: MessageEvent) {
     try {
       const data = JSON.parse(event.data);
@@ -52,24 +70,6 @@ class Discovery {
   }
 
   private closeListener(_event: CloseEvent) {}
-
-  close() {
-    this.ws.close();
-  }
-
-  static async connect(
-    added: (room: DiscoveredRoomItem) => void,
-    removed: (id: string) => void
-  ): Promise<Discovery | undefined> {
-    try {
-      const ip = await getPublicIP();
-      const ws = new WebSocket(`${wsScheme}${baseURL}/discover?ip=${ip}`);
-
-      return new Discovery(ws, added, removed);
-    } catch {
-      return;
-    }
-  }
 }
 
 export default Discovery;

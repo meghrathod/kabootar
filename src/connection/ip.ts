@@ -17,8 +17,8 @@ export function getPublicIP(): Promise<string> {
 
     pc.addEventListener("icegatheringstatechange", () => {
       if (pc.iceGatheringState === "complete") {
+        pc.close();
         if (address !== undefined) {
-          pc.close();
           resolve(address);
         } else {
           reject("unable to get public IP");
