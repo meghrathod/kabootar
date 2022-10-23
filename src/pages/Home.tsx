@@ -13,17 +13,26 @@ const HomePage: Component = () => {
   const [, setRoom] = roomSignal;
   const [, setNumClients] = numClientsSignal;
 
-  const createRoom = async () => {
-    setShareDisabled(true);
-    const room = await Room.create("movie.mp4", {
-      numClientsChanged(n: number) {
-        setNumClients(n);
-      },
-    });
+  const createRoom = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.addEventListener("change", async (_) => {
+      if (input.files.length >= 1) {
+        const file = input.files[0];
 
-    setRoom(room);
-    navigate(`/${room.id}#${room.constructHash()}`);
-    setShareDisabled(false);
+        setShareDisabled(true);
+        const room = await Room.create(file, {
+          numClientsChanged(n: number) {
+            setNumClients(n);
+          },
+        });
+
+        setRoom(room);
+        navigate(`/${room.id}#${room.constructHash()}`);
+        setShareDisabled(false);
+      }
+    });
+    input.click();
   };
 
   return (

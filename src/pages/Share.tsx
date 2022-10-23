@@ -232,7 +232,7 @@ const SharePage: Component = () => {
   const [, setConnected] = connectedSignal;
   const [, setPercentage] = percentageSignal;
 
-  const [filename, setFileName] = createSignal(room()?.fileName ?? undefined);
+  const [filename, setFileName] = createSignal(room()?.file.name ?? undefined);
   const routerParams = useParams();
 
   onMount(async () => {

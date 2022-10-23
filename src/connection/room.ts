@@ -26,14 +26,14 @@ class Room<Master extends boolean> {
     public emoji: string,
     private ws: WebSocket,
     private clientKey: string,
-    public fileName: Master extends true ? string : undefined,
+    public file: Master extends true ? File : undefined,
     private eventDispatcher: RoomEventDispatcher<Master>,
     public pin?: string
   ) {
     this.handler = isMaster
       ? new MasterHandler(
           ws,
-          fileName,
+          file,
           eventDispatcher as RoomEventDispatcher<true>
         )
       : new ClientHandler(ws, eventDispatcher as RoomEventDispatcher<false>);
@@ -42,7 +42,7 @@ class Room<Master extends boolean> {
   }
 
   static async create(
-    fileName: string,
+    file: File,
     dispatcher: RoomEventDispatcher<true>
   ): Promise<Room<true> | undefined> {
     const response = await fetch(`${httpScheme}${baseURL}/room`, {
@@ -68,7 +68,7 @@ class Room<Master extends boolean> {
       emoji,
       ws,
       clientKey,
-      fileName,
+      file,
       dispatcher,
       pin
     );
@@ -147,14 +147,14 @@ class Room<Master extends boolean> {
   }
 }
 
-const metaChannelLabel = "meta";
+const channelLabel = "d";
 
 class MasterHandler {
   clients: Map<string, MasterClient>;
 
   constructor(
     private ws: WebSocket,
-    private _fileName: string,
+    private file: File,
     private dispatcher: RoomEventDispatcher<true>
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
@@ -191,11 +191,13 @@ class MasterHandler {
       data[1],
       new MasterClient(
         data[1],
+        this.file,
         (id, signal) => {
           this.ws.send(JSON.stringify(["0", id, signal]));
         },
         () => {
-          // TODO(AG): Handle closure
+          this.clients.delete(data[1]);
+          this.dispatcher.numClientsChanged(this.clients.size);
         }
       )
     );
@@ -240,31 +242,59 @@ enum ClientMasterSignal {
   TRICKLE_ICE,
 }
 
-class MasterClient {
-  metaOpen: boolean;
-  closed: boolean;
+enum FileChannelHeader {
+  METADATA,
+  CHUNK,
+  DONE,
+}
 
-  pc: RTCPeerConnection;
-  metaChannel: RTCDataChannel;
+const chunkSize = 15 * 1024; // 15 KiB
+
+class MasterClient {
+  private channelOpen: boolean;
+  private closed: boolean;
+
+  private pc: RTCPeerConnection;
+  private dataChannel: RTCDataChannel;
 
   constructor(
     private id: string,
+    private file: File,
     private sendSignal: (id: string, signal: string) => void,
-    private _onClose: () => void
+    private onClose: () => void
   ) {
     this.closed = false;
 
     this.pc = new RTCPeerConnection({ ...iceServers });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
+    this.pc.addEventListener(
+      "connectionstatechange",
+      this.onConnectionStateChange.bind(this)
+    );
 
-    this.metaChannel = this.pc.createDataChannel(metaChannelLabel);
-    this.metaChannel.addEventListener("open", this.metaChannelOpen.bind(this));
-    this.metaChannel.addEventListener(
+    this.createDataChannel();
+    // noinspection JSIgnoredPromiseFromCall
+    this.makeOffer();
+  }
+
+  private createDataChannel() {
+    this.dataChannel = this.pc.createDataChannel(channelLabel, {
+      ordered: true,
+    });
+    this.dataChannel.addEventListener("open", this.metaChannelOpen.bind(this));
+    this.dataChannel.addEventListener(
       "close",
       this.metaChannelClose.bind(this)
     );
-    // noinspection JSIgnoredPromiseFromCall
-    this.makeOffer();
+  }
+
+  private onConnectionStateChange(_event: Event) {
+    if (
+      this.pc.connectionState === "closed" ||
+      this.pc.connectionState === "disconnected"
+    ) {
+      this.close();
+    }
   }
 
   public handleSignal(signal: string) {
@@ -288,6 +318,7 @@ class MasterClient {
   close() {
     this.closed = true;
     this.pc.close();
+    this.onClose();
   }
 
   private onIceCandidate(event: RTCPeerConnectionIceEvent) {
@@ -324,19 +355,80 @@ class MasterClient {
     );
   }
 
-  private metaChannelOpen(_event: Event) {
-    this.metaOpen = true;
+  private async sendMetadata() {
+    const digest = await crypto.subtle.digest(
+      "SHA-512",
+      await this.file.arrayBuffer()
+    );
+
+    const message = JSON.stringify([this.file.name, this.file.size]);
+
+    const buf = new ArrayBuffer(message.length + 65);
+    const view = new Uint8Array(buf);
+    view.set([FileChannelHeader.METADATA], 0);
+    view.set(new Uint8Array(digest), 1);
+    view.set(new TextEncoder().encode(message), 65);
+
+    this.dataChannel.send(buf);
+  }
+
+  private async sendFile() {
+    const fileSize = this.file.size;
+
+    let sent = 0;
+    let chunkNum = 0;
+    while (sent < fileSize) {
+      const end = sent + chunkSize > fileSize ? fileSize : sent + chunkSize;
+      await this.sendFileChunk(chunkNum, this.file.slice(sent, end));
+      chunkNum++;
+      sent = end;
+    }
+  }
+
+  private async sendFileChunk(chunkNum: number, chunk: Blob) {
+    const buf = new ArrayBuffer(chunk.size + 5);
+    const view = new Uint8Array(buf);
+    view.set([FileChannelHeader.CHUNK], 0);
+    view.set(new Uint32Array([chunkNum]), 1);
+    view.set(new Uint8Array(await chunk.arrayBuffer()), 5);
+
+    this.dataChannel.send(buf);
+  }
+
+  private sendDone() {
+    const buf = new ArrayBuffer(1);
+    const view = new Uint8Array(buf);
+    view.set([FileChannelHeader.DONE]);
+
+    this.dataChannel.send(buf);
+  }
+
+  private async metaChannelOpen(_event: Event) {
+    this.channelOpen = true;
+    await this.sendMetadata();
+    await this.sendFile();
+    this.sendDone();
   }
 
   private metaChannelClose(_event: Event) {
-    this.metaOpen = false;
+    this.channelOpen = false;
     this.close();
   }
 }
 
+interface FileMetadata {
+  name: string;
+  size: number;
+  digest: Uint8Array;
+}
+
 class ClientHandler {
   private pc: RTCPeerConnection;
-  private metaChannel: RTCDataChannel;
+  private dataChannel: RTCDataChannel;
+
+  private fileChunks: BlobPart[];
+  private metadata?: FileMetadata;
+  private received: number;
 
   constructor(
     private ws: WebSocket,
@@ -361,10 +453,85 @@ class ClientHandler {
   }
 
   private onDataChannel(event: RTCDataChannelEvent) {
-    if (event.channel.label === metaChannelLabel) {
-      this.metaChannel = event.channel;
+    if (event.channel.label === channelLabel) {
+      this.dataChannel = event.channel;
+      this.dataChannel.addEventListener(
+        "message",
+        this.onDataChannelMessage.bind(this)
+      );
       this.dispatcher.connectionStatusChanged(true);
     }
+  }
+
+  private async onDataChannelMessage(event: MessageEvent<Blob>) {
+    try {
+      const buf = await event.data.arrayBuffer();
+      const view = new Uint8Array(buf);
+
+      switch (view[0]) {
+        case FileChannelHeader.METADATA:
+          this.handleMetadata(view);
+          break;
+
+        case FileChannelHeader.CHUNK:
+          const num = new Uint32Array(view.slice(1, 5));
+          this.handleChunk(num[0], view.slice(5));
+          break;
+
+        case FileChannelHeader.DONE:
+          await this.handleEnd();
+          break;
+      }
+    } catch {}
+  }
+
+  private handleMetadata(view: Uint8Array) {
+    const digest = view.slice(1);
+    const [name, size] = JSON.parse(new TextDecoder().decode(view.slice(65)));
+    this.fileChunks = new Array(Math.ceil(size / chunkSize));
+    this.metadata = { name, size, digest };
+    this.dispatcher.filenameChanged(name);
+    this.received = 0;
+  }
+
+  private handleChunk(num: number, chunk: Uint8Array) {
+    this.fileChunks[num] = chunk;
+    this.received += chunk.length;
+
+    this.dispatcher.receivePercentageChanged(
+      Math.floor((this.received * 100) / this.metadata.size)
+    );
+  }
+
+  private async handleEnd() {
+    const blob = new Blob(this.fileChunks);
+
+    const digest = await crypto.subtle.digest(
+      "SHA-512",
+      await blob.arrayBuffer()
+    );
+    const digestView = new Uint8Array(digest);
+
+    if (!this.compareDigest(digestView, this.metadata.digest)) {
+      // TODO(AG): Handle error
+      return;
+    }
+
+    const a = document.createElement("a");
+    a.download = this.metadata.name;
+    a.href = URL.createObjectURL(blob);
+
+    a.click();
+  }
+
+  private compareDigest(a: Uint8Array, b: Uint8Array): boolean {
+    for (let i = 0; i < 64; i++) {
+      if (a[i] !== b[i]) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private handleMessage(event: MessageEvent) {
@@ -428,7 +595,9 @@ class ClientHandler {
     this.ws.send(JSON.stringify(["0", message]));
   }
 
-  private handleGone(_data: string[]) {}
+  private handleGone(_data: string[]) {
+    this.dispatcher.connectionStatusChanged(false);
+  }
 }
 
 async function getDiscoveryParams() {
