@@ -666,7 +666,9 @@ class BlobFileSaver implements FileSaver {
 
   constructor(public name: string, public size: number) {}
 
-  async initialize() {}
+  async initialize() {
+    this.parts = [];
+  }
 
   async append(data: ArrayBuffer) {
     this.parts.push(data);
@@ -680,9 +682,6 @@ class BlobFileSaver implements FileSaver {
     a.download = this.name;
     a.href = url;
     a.click();
-
-    URL.revokeObjectURL(url);
-    this.parts = [];
   }
 }
 
