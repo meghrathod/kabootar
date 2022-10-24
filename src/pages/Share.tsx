@@ -9,6 +9,7 @@ import { useParams } from "@solidjs/router";
 
 import { emojiBackground } from "../utils/emoji";
 import Room from "../connection/room";
+import { PrimaryButton } from "../components/Button";
 
 // Signals
 export const roomSignal = createSignal<Room<boolean> | undefined>();
@@ -16,6 +17,7 @@ export const numClientsSignal = createSignal(0);
 const connectedSignal = createSignal(false);
 const percentageSignal = createSignal(0);
 const speedSignal = createSignal(0);
+const needsStartSignal = createSignal(true);
 
 interface RoomDetailsProps {
   name: string;
@@ -166,15 +168,15 @@ const ClientFooter: Component<{ progress: number }> = (props) => {
   const [speed] = speedSignal;
 
   const readableSpeed = () => {
-    let s = speed();
+    const currentSpeed = speed();
 
-    if (s < 1024) {
-      return `${s} B`;
-    } else if (s < 1024 * 1024) {
-      return `${(s / 1024).toFixed(2)} KiB`;
+    if (currentSpeed < 1024) {
+      return `${currentSpeed} B`;
+    } else if (currentSpeed < 1024 * 1024) {
+      return `${(currentSpeed / 1024).toFixed(2)} KiB`;
     }
 
-    return `${(s / (1024 * 1024)).toFixed(2)} MiB`;
+    return `${(currentSpeed / (1024 * 1024)).toFixed(2)} MiB`;
   };
 
   return (
@@ -209,17 +211,40 @@ const ProgressBar: Component<{ progress: number }> = (props) => {
   );
 };
 
+const ClientStartButton: Component = () => {
+  const [room] = roomSignal;
+
+  return (
+    <PrimaryButton
+      onClick={() => {
+        room().dispatch("ready");
+      }}
+    >
+      Start Download
+    </PrimaryButton>
+  );
+};
+
 const ClientShare: Component = () => {
   const [connected] = connectedSignal;
+  const [needsStart] = needsStartSignal;
   const [percentage] = percentageSignal;
 
-  return connected ? (
+  return (
     <>
-      <ProgressBar progress={percentage()} />
-      <ClientFooter progress={percentage()} />
+      {connected() ? (
+        needsStart() ? (
+          <ClientStartButton />
+        ) : (
+          <>
+            <ProgressBar progress={percentage()} />
+            <ClientFooter progress={percentage()} />
+          </>
+        )
+      ) : (
+        <Connecting />
+      )}{" "}
     </>
-  ) : (
-    <Connecting />
   );
 };
 
@@ -248,6 +273,7 @@ const SharePage: Component = () => {
   const [, setConnected] = connectedSignal;
   const [, setPercentage] = percentageSignal;
   const [, setSpeed] = speedSignal;
+  const [, setNeedsStart] = needsStartSignal;
 
   const [filename, setFileName] = createSignal(room()?.file.name ?? undefined);
   const routerParams = useParams();
@@ -274,6 +300,9 @@ const SharePage: Component = () => {
         },
         connectionSpeed(speed: number) {
           setSpeed(speed);
+        },
+        needsStart(needs: boolean) {
+          setNeedsStart(needs);
         },
       });
       if (newRoom !== undefined) {

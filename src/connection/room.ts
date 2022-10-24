@@ -9,6 +9,7 @@ interface MasterEventDispatcher {
 interface ClientEventDispatcher {
   receivePercentageChanged(percentage: number);
   connectionStatusChanged(connected: boolean);
+  needsStart(needs: boolean);
   filenameChanged(name: string);
   connectionSpeed(speed: number);
 }
@@ -143,6 +144,10 @@ class Room<Master extends boolean> {
     this.ws.close();
   }
 
+  dispatch(event: string) {
+    this.handler.dispatch(event);
+  }
+
   private handleClose(_event: CloseEvent) {
     this.handler.goodbye();
   }
@@ -163,6 +168,8 @@ class MasterHandler {
   }
 
   goodbye() {}
+
+  dispatch(_event: string) {}
 
   private handleMessage(event: MessageEvent) {
     try {
@@ -281,6 +288,10 @@ class MasterClient {
       "close",
       this.metaChannelClose.bind(this)
     );
+    this.dataChannel.addEventListener(
+      "message",
+      this.handleDataChannelMessage.bind(this)
+    );
   }
 
   private onConnectionStateChange(_event: Event) {
@@ -398,11 +409,16 @@ class MasterClient {
     readChunk(this.offset);
   }
 
+  private handleDataChannelMessage(event: MessageEvent<string>) {
+    if (event.data === "ready") {
+      this.sendFile();
+    }
+  }
+
   private dataChannelOpen(_event: Event) {
     this.channelOpen = true;
     this.offset = 0;
     this.sendMetadata();
-    this.sendFile();
   }
 
   private metaChannelClose(_event: Event) {
@@ -420,7 +436,6 @@ class ClientHandler {
   private pc: RTCPeerConnection;
   private dataChannel: RTCDataChannel;
 
-  private fileChunks: BlobPart[];
   private metadata?: FileMetadata;
   private received: number;
 
@@ -438,6 +453,24 @@ class ClientHandler {
 
   goodbye() {}
 
+  async dispatch(event: string) {
+    switch (event) {
+      case "ready":
+        await this.ready();
+        break;
+    }
+  }
+
+  private async ready() {
+    try {
+      await this.fileSaver.initialize();
+      this.dispatcher.needsStart(false);
+      this.dataChannel.send("ready");
+    } catch {
+      // TODO(AG): Handle error
+    }
+  }
+
   private onIceCandidate(event: RTCPeerConnectionIceEvent) {
     if (event.candidate) {
       this.sendSignal(
@@ -454,17 +487,16 @@ class ClientHandler {
         "message",
         this.onDataChannelMessage.bind(this)
       );
-      this.dispatcher.connectionStatusChanged(true);
     }
   }
 
-  private onDataChannelMessage(event: MessageEvent<ArrayBuffer>) {
+  private async onDataChannelMessage(event: MessageEvent<ArrayBuffer>) {
     try {
       const buf = event.data;
       const view = new Uint8Array(buf);
 
       if (!this.metadata) {
-        this.handleMetadata(view);
+        await this.handleMetadata(view);
       } else {
         this.handleChunk(view);
       }
@@ -473,15 +505,20 @@ class ClientHandler {
     }
   }
 
-  private handleMetadata(view: Uint8Array) {
+  private fileSaver: FileSaver;
+
+  private async handleMetadata(view: Uint8Array) {
     const [name, size] = JSON.parse(new TextDecoder().decode(view));
-    this.fileChunks = [];
     this.metadata = { name, size };
     this.dispatcher.filenameChanged(name);
     this.received = 0;
     this.lastSpeedSampleTime = Date.now();
     this.lastSampleReceived = 0;
     this.speed = 0;
+
+    this.fileSaver = getFileSaver(name, size);
+    this.dispatcher.connectionStatusChanged(true);
+    this.dispatcher.needsStart(true);
   }
 
   private lastSpeedSampleTime: number;
@@ -489,7 +526,8 @@ class ClientHandler {
   private speed: number;
 
   private handleChunk(chunk: Uint8Array) {
-    this.fileChunks.push(chunk);
+    // noinspection JSIgnoredPromiseFromCall
+    this.fileSaver.append(chunk);
     this.received += chunk.length;
 
     const now = Date.now();
@@ -512,14 +550,8 @@ class ClientHandler {
     }
   }
 
-  private handleEnd() {
-    const blob = new Blob(this.fileChunks);
-
-    const a = document.createElement("a");
-    a.download = this.metadata.name;
-    a.href = URL.createObjectURL(blob);
-
-    a.click();
+  private async handleEnd() {
+    await this.fileSaver.finalize();
   }
 
   private handleMessage(event: MessageEvent) {
@@ -586,6 +618,80 @@ class ClientHandler {
   private handleGone(_data: string[]) {
     this.dispatcher.connectionStatusChanged(false);
   }
+}
+
+interface FileSaver {
+  name: string;
+  size: number;
+  initialize(): Promise<void>;
+  append(data: ArrayBuffer): Promise<void>;
+  finalize(): Promise<void>;
+}
+
+class FSFileSaver implements FileSaver {
+  private handle: FileSystemHandle;
+  private writable: FileSystemWritableFileStream;
+  private position: number;
+
+  constructor(public name: string, public size: number) {}
+
+  async initialize() {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: this.name,
+      });
+      const writable = await handle.createWritable({ keepExistingData: false });
+      this.handle = handle;
+      this.writable = writable;
+      this.position = 0;
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
+  }
+
+  async append(data: ArrayBuffer) {
+    const oldPosition = this.position;
+    this.position += data.byteLength;
+    await this.writable.write({ type: "write", position: oldPosition, data });
+  }
+
+  async finalize() {
+    await this.writable.close();
+  }
+}
+
+class BlobFileSaver implements FileSaver {
+  private parts: ArrayBuffer[];
+
+  constructor(public name: string, public size: number) {}
+
+  async initialize() {}
+
+  async append(data: ArrayBuffer) {
+    this.parts.push(data);
+  }
+
+  async finalize() {
+    const blob = new Blob(this.parts);
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.download = this.name;
+    a.href = url;
+    a.click();
+
+    URL.revokeObjectURL(url);
+    this.parts = [];
+  }
+}
+
+function getFileSaver(name: string, size: number): FileSaver {
+  if ("showSaveFilePicker" in window) {
+    return new FSFileSaver(name, size);
+  }
+
+  return new BlobFileSaver(name, size);
 }
 
 async function getDiscoveryParams() {
