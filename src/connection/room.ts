@@ -1,6 +1,7 @@
 // skipcq: JS-0108
 import { getPublicIP } from "./ip";
 import { baseURL, httpScheme, iceServers, wsScheme } from "../config";
+import { FileDownloader, getFileDownloader } from "../downloader";
 
 interface MasterEventDispatcher {
   numClientsChanged(n: number);
@@ -463,7 +464,7 @@ class ClientHandler {
 
   private async ready() {
     try {
-      await this.fileSaver.initialize();
+      await this.fileDownloader.initialize();
       this.dispatcher.needsStart(false);
       this.dataChannel.send("ready");
     } catch {
@@ -505,7 +506,7 @@ class ClientHandler {
     }
   }
 
-  private fileSaver: FileSaver;
+  private fileDownloader: FileDownloader;
 
   private async handleMetadata(view: Uint8Array) {
     const [name, size] = JSON.parse(new TextDecoder().decode(view));
@@ -516,7 +517,7 @@ class ClientHandler {
     this.lastSampleReceived = 0;
     this.speed = 0;
 
-    this.fileSaver = getFileSaver(name, size);
+    this.fileDownloader = getFileDownloader(name, size);
     this.dispatcher.connectionStatusChanged(true);
     this.dispatcher.needsStart(true);
   }
@@ -527,7 +528,7 @@ class ClientHandler {
 
   private handleChunk(chunk: Uint8Array) {
     // noinspection JSIgnoredPromiseFromCall
-    this.fileSaver.append(chunk);
+    this.fileDownloader.append(chunk);
     this.received += chunk.length;
 
     const now = Date.now();
@@ -551,7 +552,7 @@ class ClientHandler {
   }
 
   private async handleEnd() {
-    await this.fileSaver.finalize();
+    await this.fileDownloader.finalize();
   }
 
   private handleMessage(event: MessageEvent) {
@@ -618,82 +619,6 @@ class ClientHandler {
   private handleGone(_data: string[]) {
     this.dispatcher.connectionStatusChanged(false);
   }
-}
-
-interface FileSaver {
-  name: string;
-  size: number;
-  initialize(): Promise<void>;
-  append(data: ArrayBuffer): Promise<void>;
-  finalize(): Promise<void>;
-}
-
-class FSFileSaver implements FileSaver {
-  private handle: FileSystemHandle;
-  private writable: FileSystemWritableFileStream;
-  private position: number;
-
-  constructor(public name: string, public size: number) {}
-
-  async initialize() {
-    try {
-      const handle = await window.showSaveFilePicker({
-        suggestedName: this.name,
-      });
-      const writable = await handle.createWritable({ keepExistingData: false });
-      this.handle = handle;
-      this.writable = writable;
-      this.position = 0;
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  }
-
-  async append(data: ArrayBuffer) {
-    const oldPosition = this.position;
-    this.position += data.byteLength;
-    await this.writable.write({ type: "write", position: oldPosition, data });
-  }
-
-  async finalize() {
-    await this.writable.close();
-  }
-}
-
-class BlobFileSaver implements FileSaver {
-  private parts: ArrayBuffer[];
-
-  constructor(public name: string, public size: number) {}
-
-  // skipcq: JS-0116, JS-0376
-  async initialize() {
-    this.parts = [];
-  }
-
-  // skipcq: JS-0116, JS-0376
-  async append(data: ArrayBuffer) {
-    this.parts.push(data);
-  }
-
-  // skipcq: JS-0116, JS-0376
-  async finalize() {
-    const blob = new Blob(this.parts);
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.download = this.name;
-    a.href = url;
-    a.click();
-  }
-}
-
-function getFileSaver(name: string, size: number): FileSaver {
-  if ("showSaveFilePicker" in window) {
-    return new FSFileSaver(name, size);
-  }
-
-  return new BlobFileSaver(name, size);
 }
 
 async function getDiscoveryParams() {
