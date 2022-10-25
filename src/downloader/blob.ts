@@ -20,10 +20,10 @@ export class BlobFileDownloader implements FileDownloader {
     const blob = new Blob(this.parts);
     const url = URL.createObjectURL(blob);
 
-    const a = document.createElement("a");
-    a.download = this.name;
-    a.href = url;
-    a.click();
+    const link = document.createElement("a");
+    link.download = this.name;
+    link.href = url;
+    link.click();
 
     URL.revokeObjectURL(url);
   }

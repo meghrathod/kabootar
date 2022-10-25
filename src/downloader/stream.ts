@@ -62,10 +62,12 @@ export class StreamFileDownloader implements FileDownloader {
     document.body.appendChild(iframe);
   }
 
+  // skipcq: JS-0116, JS-0376
   async append(data: ArrayBuffer) {
     this.controller.enqueue(data);
   }
 
+  // skipcq: JS-0116, JS-0376
   async finalize() {
     this.controller.close();
   }
