@@ -79,3 +79,14 @@ progress::-moz-progress-bar {
     ),
     linear-gradient(94.26deg, #007cf0 0%, #00dfd8 100%);
 }
+
+.dialog-panel {
+  @apply inline-block
+  w-full max-w-md p-6
+  overflow-hidden
+  transition-all transform
+  shadow-xl rounded-lg;
+
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(40px);
+}
