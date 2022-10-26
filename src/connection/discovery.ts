@@ -43,7 +43,9 @@ class Discovery {
           this.onRemoveMessage(data);
           break;
       }
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   private onAddMessage(data: string[]) {

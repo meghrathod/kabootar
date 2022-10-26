@@ -1,4 +1,4 @@
-import { FSFileDownloader } from "./fs";
+// import { FSFileDownloader } from "./fs";
 import { BlobFileDownloader } from "./blob";
 import { StreamFileDownloader } from "./stream";
 
@@ -14,9 +14,9 @@ export interface FileDownloader {
 }
 
 export function getFileDownloader(name: string, size: number): FileDownloader {
-  if ("showSaveFilePicker" in window) {
-    return new FSFileDownloader(name, size);
-  }
+  // if ("showSaveFilePicker" in window) {
+  //   return new FSFileDownloader(name, size);
+  // }
 
   if (StreamFileDownloader.isAvailable()) {
     return new StreamFileDownloader(name, size);

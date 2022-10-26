@@ -104,7 +104,9 @@ class Room<Master extends boolean> {
       ).then((res) => res.json());
 
       return response[0];
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   static async initWS(
@@ -206,7 +208,9 @@ class MasterHandler {
           this.handleSignalMessage(data);
           break;
       }
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   private handleJoin(data: string[]) {
@@ -340,7 +344,9 @@ class MasterClient {
           this.handleTrickleIce(data);
           break;
       }
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   close() {
@@ -599,7 +605,9 @@ class ClientHandler {
           this.handleGone(data);
           break;
       }
-    } catch {}
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   private handleSignalMessage(data: string[]) {
