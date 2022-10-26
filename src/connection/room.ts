@@ -13,6 +13,7 @@ interface ClientEventDispatcher {
   needsStart(needs: boolean);
   filenameChanged(name: string);
   connectionSpeed(speed: number);
+  complete();
 }
 
 export type RoomEventDispatcher<Master extends boolean> = Master extends true
@@ -547,12 +548,14 @@ class ClientHandler {
     );
 
     if (this.received === this.metadata.size) {
+      // noinspection JSIgnoredPromiseFromCall
       this.handleEnd();
     }
   }
 
   private async handleEnd() {
     await this.fileDownloader.finalize();
+    this.dispatcher.complete();
   }
 
   private handleMessage(event: MessageEvent) {

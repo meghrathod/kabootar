@@ -5,7 +5,7 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import { useParams } from "@solidjs/router";
+import { useParams, useNavigate } from "@solidjs/router";
 
 import { emojiBackground } from "../utils/emoji";
 import Room from "../connection/room";
@@ -257,7 +257,7 @@ const Connecting: Component = () => {
     setTimer(
       setInterval(() => {
         setDots(dots().length === 3 ? "" : `${dots()}.`);
-      }, 200)
+      }, 200) as unknown as number
     );
   });
 
@@ -269,6 +269,8 @@ const Connecting: Component = () => {
 };
 
 const SharePage: Component = () => {
+  const navigate = useNavigate();
+
   const [room, setRoom] = roomSignal;
   const [, setConnected] = connectedSignal;
   const [, setPercentage] = percentageSignal;
@@ -304,6 +306,9 @@ const SharePage: Component = () => {
         needsStart(needs: boolean) {
           setNeedsStart(needs);
         },
+        complete() {
+          navigate("/", { replace: true });
+        },
       });
       if (newRoom !== undefined) {
         setRoom(newRoom);
@@ -332,7 +337,7 @@ const SharePage: Component = () => {
               name={room().name}
               pin={room().pin}
               emoji={room().emoji}
-              fileName={filename()} // TODO(AG): Make this dynamic, or remove this
+              fileName={filename()}
             />
             {room().isMaster ? <MasterShare /> : <ClientShare />}
           </>
