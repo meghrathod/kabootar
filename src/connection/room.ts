@@ -133,7 +133,8 @@ class Room<Master extends boolean> {
           } else {
             resolve(false);
           }
-        } catch {
+        } catch (e) {
+          console.error(e);
           resolve(false);
         } finally {
           ws.removeEventListener("message", message);
@@ -500,7 +501,8 @@ class ClientHandler {
       await this.fileDownloader.initialize();
       this.dispatcher.needsStart(false);
       this.dataChannel.send("ready");
-    } catch {
+    } catch (e) {
+      console.error(e);
       // TODO(AG): Handle error
     }
   }
@@ -668,7 +670,8 @@ async function getDiscoveryParams() {
     }
 
     return ["f", ""];
-  } catch {
+  } catch (e) {
+    console.error(e);
     return ["f", ""];
   }
 }

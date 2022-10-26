@@ -22,7 +22,8 @@ class Discovery {
       const ws = new WebSocket(`${wsScheme}${baseURL}/discover?ip=${ip}`);
 
       return new Discovery(ws, added, removed);
-    } catch {
+    } catch (e) {
+      console.error(e);
       return;
     }
   }

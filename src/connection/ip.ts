@@ -52,7 +52,8 @@ function isPublicIP(ip: string): boolean {
       if (bNum >= 16 && bNum < 32) {
         return false;
       }
-    } catch {
+    } catch (e) {
+      console.error(e);
       return false;
     }
   }
