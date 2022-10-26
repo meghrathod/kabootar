@@ -55,11 +55,11 @@ export class StreamFileDownloader implements FileDownloader {
       };
     });
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = this.name;
-
-    a.click();
+    const iframe = document.createElement("iframe");
+    iframe.hidden = true;
+    iframe.src = url;
+    iframe.name = "iframe";
+    document.body.appendChild(iframe);
   }
 
   // skipcq: JS-0116, JS-0376
