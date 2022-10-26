@@ -17,8 +17,16 @@ export class StreamFileDownloader implements FileDownloader {
     this.sw = navigator.serviceWorker.controller;
   }
 
+  private static isSafari() {
+    const ua = navigator.userAgent;
+    return ua.indexOf("Chrome") === -1 && ua.indexOf("Safari") !== -1;
+  }
+
   static isAvailable() {
-    return navigator.serviceWorker.controller.state === "activated";
+    return (
+      !this.isSafari() &&
+      navigator.serviceWorker.controller.state === "activated"
+    );
   }
 
   async initialize() {
