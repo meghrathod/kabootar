@@ -65,7 +65,7 @@ const Header: Component<HeaderProps> = (props) => {
         >
           <path d="M11.47 1.72a.75.75 0 011.06 0l3 3a.75.75 0 01-1.06 1.06l-1.72-1.72V7.5h-1.5V4.06L9.53 5.78a.75.75 0 01-1.06-1.06l3-3zM11.25 7.5V15a.75.75 0 001.5 0V7.5h3.75a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9a3 3 0 013-3h3.75z" />
         </svg>
-        <p class="pt-[2px] line-clamp-1">{props.fileName}</p>
+        <p class="pt-[2px] line-clamp-1 overflow-hidden">{props.fileName}</p>
       </div>
     </div>
   );
@@ -290,42 +290,50 @@ const SharePage: Component = () => {
   const [, setNeedsStart] = needsStartSignal;
 
   const [filename, setFileName] = createSignal(room()?.file.name ?? undefined);
+  const [roomName, setRoomName] = createSignal(room()?.name ?? "");
+  const [emoji, setEmoji] = createSignal(room()?.emoji ?? "");
+
   const routerParams = useParams();
 
-  onMount(async () => {
-    if (room() === undefined) {
-      const hash = `?${window.location.hash.slice(1)}`;
-      const params = new URLSearchParams(hash);
+  onMount(() => {
+    setTimeout(async () => {
+      if (room() === undefined) {
+        const hash = `?${window.location.hash.slice(1)}`;
+        const params = new URLSearchParams(hash);
 
-      const id = routerParams.id;
-      const key = params.get("k");
-      const name = params.get("n");
-      const emoji = params.get("e");
+        const id = routerParams.id;
+        const key = params.get("k");
+        const name = params.get("n");
+        const emoji = params.get("e");
 
-      const newRoom = await Room.joinDirect(id, key, name, emoji, {
-        filenameChanged(name: string) {
-          setFileName(name);
-        },
-        connectionStatusChanged(connected: boolean) {
-          setConnected(connected);
-        },
-        receivePercentageChanged(percentage: number) {
-          setPercentage(percentage);
-        },
-        connectionSpeed(speed: number) {
-          setSpeed(speed);
-        },
-        needsStart(needs: boolean) {
-          setNeedsStart(needs);
-        },
-        complete() {
-          navigate("/", { replace: true });
-        },
-      });
-      if (newRoom !== undefined) {
-        setRoom(newRoom);
+        const newRoom = await Room.joinDirect(id, key, {
+          roomMetaChanged(name: string, roomName: string, emoji: string) {
+            console.log(roomName, emoji);
+            setFileName(name);
+            setRoomName(roomName);
+            setEmoji(emoji);
+          },
+          connectionStatusChanged(connected: boolean) {
+            setConnected(connected);
+          },
+          receivePercentageChanged(percentage: number) {
+            setPercentage(percentage);
+          },
+          connectionSpeed(speed: number) {
+            setSpeed(speed);
+          },
+          needsStart(needs: boolean) {
+            setNeedsStart(needs);
+          },
+          complete() {
+            navigate("/", { replace: true });
+          },
+        });
+        if (newRoom !== undefined) {
+          setRoom(newRoom);
+        }
       }
-    }
+    }, 0);
   }); // TODO(AG): Handle errors
 
   onCleanup(() => {
@@ -346,9 +354,9 @@ const SharePage: Component = () => {
         {room() !== undefined ? (
           <>
             <Header
-              name={room().name}
+              name={roomName()}
               pin={room().pin}
-              emoji={room().emoji}
+              emoji={emoji()}
               fileName={filename()}
             />
             {room().isMaster ? <MasterShare /> : <ClientShare />}

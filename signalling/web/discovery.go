@@ -27,3 +27,26 @@ func (h *handler) HandleDiscovery(c *websocket.Conn) {
 		}
 	}
 }
+
+func (h *handler) GetRoom(c *fiber.Ctx) error {
+	id := c.Query("id", "")
+	if id == "" {
+		return c.SendStatus(400)
+	}
+
+	pin := c.Query("pin", "")
+	if pin == "" {
+		return c.SendStatus(400)
+	}
+
+	room, ok := h.rooms.Load(id)
+	if !ok {
+		return c.SendStatus(401)
+	}
+
+	if room.PIN != pin {
+		return c.SendStatus(401)
+	}
+
+	return c.JSON([]string{room.CKey})
+}

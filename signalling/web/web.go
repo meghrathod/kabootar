@@ -25,6 +25,7 @@ func InitWeb(address string) error {
 	h := newHandler()
 
 	app.Post("/room", h.CreateRoom)
+	app.Get("/room", h.GetRoom)
 	app.Get("/ws/:room_id", h.InitializeWS, websocket.New(h.HandleWS))
 	app.Get("/discover", h.ValidateDiscoveryRequest,
 		h.InitializeWS, websocket.New(h.HandleDiscovery))

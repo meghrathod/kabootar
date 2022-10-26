@@ -7,12 +7,15 @@ const DiscoveredRoom: Component<{
   onClick?: () => void;
 }> = (props) => {
   return (
-    <div class="flex flex-row items-center my-4 gap-4">
+    <button
+      class="flex flex-row items-center my-4 gap-4"
+      onClick={props.onClick}
+    >
       <p style={{ background: props.room.background }} class="emoji">
         {props.room.emoji}
       </p>
       <p class="text-xl line-clamp-1">{props.room.name}</p>
-    </div>
+    </button>
   );
 };
 

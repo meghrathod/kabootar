@@ -90,3 +90,14 @@ progress::-moz-progress-bar {
   background-color: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(40px);
 }
+
+/* Hide the input spinners */
+::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

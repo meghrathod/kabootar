@@ -11,7 +11,7 @@ interface ClientEventDispatcher {
   receivePercentageChanged(percentage: number);
   connectionStatusChanged(connected: boolean);
   needsStart(needs: boolean);
-  filenameChanged(name: string);
+  roomMetaChanged(name: string, roomName: string, emoji: string);
   connectionSpeed(speed: number);
   complete();
 }
@@ -38,7 +38,9 @@ class Room<Master extends boolean> {
       ? new MasterHandler(
           ws,
           file,
-          eventDispatcher as RoomEventDispatcher<true>
+          eventDispatcher as RoomEventDispatcher<true>,
+          name,
+          emoji
         )
       : new ClientHandler(ws, eventDispatcher as RoomEventDispatcher<false>);
 
@@ -81,8 +83,6 @@ class Room<Master extends boolean> {
   static async joinDirect(
     id: string,
     key: string,
-    name: string,
-    emoji: string,
     dispatcher: RoomEventDispatcher<false>
   ): Promise<Room<false> | undefined> {
     const ws = await this.initWS(id, key, false);
@@ -90,7 +90,21 @@ class Room<Master extends boolean> {
       return undefined;
     }
 
-    return new Room(false, id, name, emoji, ws, key, undefined, dispatcher);
+    return new Room(false, id, "", "", ws, key, undefined, dispatcher);
+  }
+
+  static async getClientKey(id: string, pin: string): Promise<string | void> {
+    try {
+      const params = new URLSearchParams();
+      params.set("id", id);
+      params.set("pin", pin);
+
+      const response = await fetch(
+        `${httpScheme}${baseURL}/room?${params.toString()}`
+      ).then((res) => res.json());
+
+      return response[0];
+    } catch {}
   }
 
   static async initWS(
@@ -139,7 +153,7 @@ class Room<Master extends boolean> {
   }
 
   constructHash() {
-    return `k=${this.clientKey}&n=${this.name}&e=${this.emoji}`;
+    return `k=${this.clientKey}`;
   }
 
   close() {
@@ -163,7 +177,9 @@ class MasterHandler {
   constructor(
     private ws: WebSocket,
     private file: File,
-    private dispatcher: RoomEventDispatcher<true>
+    private dispatcher: RoomEventDispatcher<true>,
+    private name: string,
+    private emoji: string
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.clients = new Map();
@@ -202,6 +218,8 @@ class MasterHandler {
       new MasterClient(
         data[1],
         this.file,
+        this.name,
+        this.emoji,
         (id, signal) => {
           this.ws.send(JSON.stringify(["0", id, signal]));
         },
@@ -264,6 +282,8 @@ class MasterClient {
   constructor(
     private id: string,
     private file: File,
+    private name: string,
+    private emoji: string,
     private sendSignal: (id: string, signal: string) => void,
     private onClose: () => void
   ) {
@@ -364,11 +384,17 @@ class MasterClient {
   }
 
   private sendMetadata() {
-    const message = JSON.stringify([this.file.name, this.file.size]);
+    const message = JSON.stringify([
+      this.file.name,
+      this.file.size,
+      this.name,
+      this.emoji,
+    ]);
 
-    const buf = new ArrayBuffer(message.length);
+    const encoded = new TextEncoder().encode(message);
+    const buf = new ArrayBuffer(encoded.byteLength);
     const view = new Uint8Array(buf);
-    view.set(new TextEncoder().encode(message), 0);
+    view.set(encoded, 0);
 
     this.dataChannel.send(buf);
   }
@@ -510,9 +536,11 @@ class ClientHandler {
   private fileDownloader: FileDownloader;
 
   private async handleMetadata(view: Uint8Array) {
-    const [name, size] = JSON.parse(new TextDecoder().decode(view));
+    const [name, size, roomName, emoji] = JSON.parse(
+      new TextDecoder().decode(view)
+    );
     this.metadata = { name, size };
-    this.dispatcher.filenameChanged(name);
+    this.dispatcher.roomMetaChanged(name, roomName, emoji);
     this.received = 0;
     this.lastSpeedSampleTime = Date.now();
     this.lastSampleReceived = 0;
