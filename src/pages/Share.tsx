@@ -302,8 +302,6 @@ const SharePage: Component = () => {
 
         const id = routerParams.id;
         const key = params.get("k");
-        const name = params.get("n");
-        const emoji = params.get("e");
 
         const newRoom = await Room.joinDirect(id, key, {
           roomMetaChanged(name: string, roomName: string, emoji: string) {

@@ -48,7 +48,8 @@ class Room<Master extends boolean> {
           name,
           emoji,
           clientKey,
-          turnServer
+          turnServer,
+          id
         )
       : new ClientHandler(
           ws,
@@ -211,7 +212,8 @@ class MasterHandler {
     private name: string,
     private emoji: string,
     private clientKey: string,
-    private turnServer: string
+    private turnServer: string,
+    private roomID: string
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.clients = new Map();
@@ -262,7 +264,8 @@ class MasterHandler {
           this.dispatcher.numClientsChanged(this.clients.size);
         },
         this.clientKey,
-        this.turnServer
+        this.turnServer,
+        this.roomID
       )
     );
     this.dispatcher.numClientsChanged(this.clients.size);
@@ -324,14 +327,15 @@ class MasterClient {
     private sendSignal: (id: string, signal: string) => void,
     private onClose: () => void,
     private clientKey: string,
-    private turnServer: string
+    private turnServer: string,
+    private roomID: string
   ) {
     this.closed = false;
 
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...iceServers.iceServers,
-        { urls: `turn:${turnServer}`, username: id, credential: clientKey },
+        { urls: `turn:${turnServer}`, username: roomID, credential: clientKey },
       ],
     });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
@@ -524,6 +528,12 @@ class ClientHandler {
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.dispatcher.connectionStatusChanged(false);
+
+    console.log({
+      urls: `turn:${turnServer}`,
+      username: id,
+      credential: clientKey,
+    });
 
     this.pc = new RTCPeerConnection({
       iceServers: [
