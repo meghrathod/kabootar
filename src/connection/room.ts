@@ -518,6 +518,7 @@ class ClientHandler {
   private lastSpeedSampleTime: number;
   private lastSampleReceived: number;
   private speed: number;
+  private connectionTimeout: number;
 
   constructor(
     private ws: WebSocket,
@@ -535,14 +536,26 @@ class ClientHandler {
       credential: clientKey,
     });
 
+    this.connectionTimeout = setTimeout(() => {}, 5_000) as unknown as number; // 5s
     this.pc = new RTCPeerConnection({
-      iceServers: [
-        ...iceServers.iceServers,
-        { urls: `turn:${turnServer}`, username: id, credential: clientKey },
-      ],
+      iceServers: [...iceServers.iceServers],
     });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
     this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
+  }
+
+  useTurn() {
+    const oldConfig = this.pc.getConfiguration();
+    this.pc.setConfiguration({
+      iceServers: [
+        ...oldConfig.iceServers,
+        {
+          urls: `turn:${this.turnServer}`,
+          username: this.id,
+          credential: this.clientKey,
+        },
+      ],
+    });
   }
 
   goodbye() {}
@@ -576,6 +589,7 @@ class ClientHandler {
 
   private onDataChannel(event: RTCDataChannelEvent) {
     if (event.channel.label === channelLabel) {
+      clearTimeout(this.connectionTimeout);
       this.dataChannel = event.channel;
       this.dataChannel.binaryType = "arraybuffer";
       this.dataChannel.addEventListener(
