@@ -7,15 +7,12 @@ import (
 	"github.com/gofiber/websocket/v2"
 )
 
-func InitWeb(address string) error {
+func InitWeb(address, corsEndpoint string) error {
 	app := fiber.New()
 	app.Use(recover.New())
 
 	app.Use(cors.New(cors.Config{
-		AllowHeaders:     "Content-Type, Access-Control-Allow-Origin",
-		AllowOrigins:     "*", // TODO(AG): fix this
-		AllowCredentials: true,
-		AllowMethods:     "GET,POST",
+		AllowOrigins: corsEndpoint,
 	}))
 
 	app.Get("/ping", func(c *fiber.Ctx) error {

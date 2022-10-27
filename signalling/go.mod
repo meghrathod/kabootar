@@ -3,6 +3,7 @@ module github.com/gargakshit/kabootar/signalling
 go 1.19
 
 require (
+	github.com/BurntSushi/toml v1.2.1
 	github.com/gofiber/fiber/v2 v2.37.0
 	github.com/gofiber/websocket/v2 v2.0.25
 	github.com/puzpuzpuz/xsync v1.4.3
