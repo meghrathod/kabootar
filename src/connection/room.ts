@@ -536,29 +536,14 @@ class ClientHandler {
       credential: clientKey,
     });
 
-    this.connectionTimeout = setTimeout(
-      this.useTurn.bind(this),
-      5_000
-    ) as unknown as number; // 5s
     this.pc = new RTCPeerConnection({
-      iceServers: [...iceServers.iceServers],
+      iceServers: [
+        ...iceServers.iceServers,
+        { urls: `turn:${turnServer}`, username: id, credential: clientKey },
+      ],
     });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
     this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
-  }
-
-  useTurn() {
-    const oldConfig = this.pc.getConfiguration();
-    this.pc.setConfiguration({
-      iceServers: [
-        ...oldConfig.iceServers,
-        {
-          urls: `turn:${this.turnServer}`,
-          username: this.id,
-          credential: this.clientKey,
-        },
-      ],
-    });
   }
 
   goodbye() {}
