@@ -182,12 +182,14 @@ const ClientFooter: Component<{ progress: number }> = (props) => {
   const readableSpeed = () => {
     const currentSpeed = speed();
 
-    if (currentSpeed < 1024) {
-      return `${currentSpeed * 8} b`;
-    } else if (currentSpeed < 1024 * 1024) {
-      return `${((currentSpeed * 8) / 1024).toFixed(2)} Kib`;
+    const speedBits = currentSpeed * 8;
+
+    if (speedBits < 1024) {
+      return `${speedBits} b`;
+    } else if (speedBits < 1024 * 1024) {
+      return `${(speedBits / 1024).toFixed(2)} Kib`;
     }
-    return `${((currentSpeed * 8) / (1024 * 1024)).toFixed(2)} Mib`;
+    return `${(speedBits / (1024 * 1024)).toFixed(2)} Mib`;
   };
 
   return (
