@@ -24,7 +24,7 @@ func (h *handler) HandleWS(c *websocket.Conn) {
 		c.Close()
 		return
 	}
-	c.WriteJSON([]string{"-1"})
+	c.WriteJSON([]string{"-1", h.turnURL})
 
 	defer h.leaveRoom(roomID, clientID, isMaster)
 

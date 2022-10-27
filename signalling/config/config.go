@@ -7,6 +7,10 @@ import (
 type Config struct {
 	ListenAddress string `toml:"listen_address"`
 	CorsEndpoint  string `toml:"cors_endpoint"`
+	TurnRealm     string `toml:"turn_realm"`
+	TurnListenIP  string `toml:"turn_listen_ip"`
+	PublicIP      string `toml:"public_ip"`
+	TurnPort      int    `toml:"turn_port"`
 }
 
 func NewConfig(filePath string) (*Config, error) {

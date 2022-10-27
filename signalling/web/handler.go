@@ -2,9 +2,12 @@ package web
 
 import (
 	"errors"
+	"strconv"
 
+	"github.com/gargakshit/kabootar/signalling/config"
 	"github.com/gargakshit/kabootar/signalling/util"
 	"github.com/gofiber/websocket/v2"
+	"github.com/pion/turn/v2"
 	"github.com/puzpuzpuz/xsync"
 )
 
@@ -12,13 +15,18 @@ type handler struct {
 	rooms            *xsync.MapOf[*Room]
 	discoverable     *xsync.MapOf[map[*Room]struct{}]
 	discoveryClients *xsync.MapOf[map[*websocket.Conn]struct{}]
+	cfg              *config.Config
+	turnServer       *turn.Server
+	turnURL          string
 }
 
-func newHandler() *handler {
+func newHandler(cfg *config.Config) *handler {
 	return &handler{
 		rooms:            xsync.NewMapOf[*Room](),
 		discoverable:     xsync.NewMapOf[map[*Room]struct{}](),
 		discoveryClients: xsync.NewMapOf[map[*websocket.Conn]struct{}](),
+		cfg:              cfg,
+		turnURL:          cfg.TurnRealm + ":" + strconv.Itoa(cfg.TurnPort),
 	}
 }
 
@@ -28,7 +36,7 @@ func (h *handler) newRoom() (string, *Room, error) {
 		return "", nil, err
 	}
 
-	room, err := NewRoom(roomID)
+	room, err := NewRoom(roomID, h.cfg.TurnRealm)
 	if err != nil {
 		return "", nil, err
 	}

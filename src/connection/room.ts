@@ -9,10 +9,15 @@ interface MasterEventDispatcher {
 
 interface ClientEventDispatcher {
   receivePercentageChanged(percentage: number);
+
   connectionStatusChanged(connected: boolean);
+
   needsStart(needs: boolean);
+
   roomMetaChanged(name: string, roomName: string, emoji: string);
+
   connectionSpeed(speed: number);
+
   complete();
 }
 
@@ -32,6 +37,7 @@ class Room<Master extends boolean> {
     private clientKey: string,
     public file: Master extends true ? File : undefined,
     private eventDispatcher: RoomEventDispatcher<Master>,
+    private turnServer: string,
     public pin?: string
   ) {
     this.handler = isMaster
@@ -40,9 +46,17 @@ class Room<Master extends boolean> {
           file,
           eventDispatcher as RoomEventDispatcher<true>,
           name,
-          emoji
+          emoji,
+          clientKey,
+          turnServer
         )
-      : new ClientHandler(ws, eventDispatcher as RoomEventDispatcher<false>);
+      : new ClientHandler(
+          ws,
+          eventDispatcher as RoomEventDispatcher<false>,
+          id,
+          clientKey,
+          turnServer
+        );
 
     ws.addEventListener("close", this.handleClose.bind(this));
   }
@@ -72,10 +86,11 @@ class Room<Master extends boolean> {
       roomID,
       roomName,
       emoji,
-      ws,
+      ws[0],
       clientKey,
       file,
       dispatcher,
+      ws[1],
       pin
     );
   }
@@ -90,7 +105,18 @@ class Room<Master extends boolean> {
       return undefined;
     }
 
-    return new Room(false, id, "", "", ws, key, undefined, dispatcher);
+    return new Room(
+      false,
+      id,
+      "",
+      "",
+      ws[0],
+      key,
+      undefined,
+      dispatcher,
+      ws[1],
+      undefined
+    );
   }
 
   static async getClientKey(id: string, pin: string): Promise<string | void> {
@@ -113,12 +139,12 @@ class Room<Master extends boolean> {
     id: string,
     key: string,
     isMaster: boolean
-  ): Promise<WebSocket | undefined> {
+  ): Promise<[WebSocket, string] | undefined> {
     const ws = new WebSocket(
       `${wsScheme}${baseURL}/ws/${id}?k=${key}&m=${isMaster ? "t" : "f"}`
     );
 
-    const canConnect = await new Promise<boolean>((resolve) => {
+    const canConnect = await new Promise<false | [true, string]>((resolve) => {
       function close(_event: CloseEvent) {
         ws.removeEventListener("close", close);
         resolve(false);
@@ -128,8 +154,9 @@ class Room<Master extends boolean> {
 
       function message(event: MessageEvent) {
         try {
-          if (JSON.parse(event.data)[0] === "-1") {
-            resolve(true);
+          const data = JSON.parse(event.data);
+          if (data[0] === "-1") {
+            resolve([true, data[1]]);
           } else {
             resolve(false);
           }
@@ -145,7 +172,7 @@ class Room<Master extends boolean> {
     });
 
     if (canConnect) {
-      return ws;
+      return [ws, canConnect[1]];
     }
 
     if (ws.readyState !== ws.CLOSED || ws.readyState !== ws.CLOSING) {
@@ -182,7 +209,9 @@ class MasterHandler {
     private file: File,
     private dispatcher: RoomEventDispatcher<true>,
     private name: string,
-    private emoji: string
+    private emoji: string,
+    private clientKey: string,
+    private turnServer: string
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.clients = new Map();
@@ -231,7 +260,9 @@ class MasterHandler {
         () => {
           this.clients.delete(data[1]);
           this.dispatcher.numClientsChanged(this.clients.size);
-        }
+        },
+        this.clientKey,
+        this.turnServer
       )
     );
     this.dispatcher.numClientsChanged(this.clients.size);
@@ -283,6 +314,7 @@ class MasterClient {
 
   private pc: RTCPeerConnection;
   private dataChannel: RTCDataChannel;
+  private offset: number;
 
   constructor(
     private id: string,
@@ -290,11 +322,18 @@ class MasterClient {
     private name: string,
     private emoji: string,
     private sendSignal: (id: string, signal: string) => void,
-    private onClose: () => void
+    private onClose: () => void,
+    private clientKey: string,
+    private turnServer: string
   ) {
     this.closed = false;
 
-    this.pc = new RTCPeerConnection({ ...iceServers });
+    this.pc = new RTCPeerConnection({
+      iceServers: [
+        ...iceServers.iceServers,
+        { urls: `turn:${turnServer}`, username: id, credential: clientKey },
+      ],
+    });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
     this.pc.addEventListener(
       "connectionstatechange",
@@ -304,30 +343,6 @@ class MasterClient {
     this.createDataChannel();
     // noinspection JSIgnoredPromiseFromCall
     this.makeOffer();
-  }
-
-  private createDataChannel() {
-    this.dataChannel = this.pc.createDataChannel(channelLabel, {
-      ordered: true,
-    });
-    this.dataChannel.addEventListener("open", this.dataChannelOpen.bind(this));
-    this.dataChannel.addEventListener(
-      "close",
-      this.metaChannelClose.bind(this)
-    );
-    this.dataChannel.addEventListener(
-      "message",
-      this.handleDataChannelMessage.bind(this)
-    );
-  }
-
-  private onConnectionStateChange(_event: Event) {
-    if (
-      this.pc.connectionState === "closed" ||
-      this.pc.connectionState === "disconnected"
-    ) {
-      this.close();
-    }
   }
 
   public handleSignal(signal: string) {
@@ -354,6 +369,30 @@ class MasterClient {
     this.closed = true;
     this.pc.close();
     this.onClose();
+  }
+
+  private createDataChannel() {
+    this.dataChannel = this.pc.createDataChannel(channelLabel, {
+      ordered: true,
+    });
+    this.dataChannel.addEventListener("open", this.dataChannelOpen.bind(this));
+    this.dataChannel.addEventListener(
+      "close",
+      this.metaChannelClose.bind(this)
+    );
+    this.dataChannel.addEventListener(
+      "message",
+      this.handleDataChannelMessage.bind(this)
+    );
+  }
+
+  private onConnectionStateChange(_event: Event) {
+    if (
+      this.pc.connectionState === "closed" ||
+      this.pc.connectionState === "disconnected"
+    ) {
+      this.close();
+    }
   }
 
   private onIceCandidate(event: RTCPeerConnectionIceEvent) {
@@ -405,8 +444,6 @@ class MasterClient {
 
     this.dataChannel.send(buf);
   }
-
-  private offset: number;
 
   private onBufferedAmountLow(_event: Event) {
     // Send queue cleared
@@ -473,15 +510,27 @@ class ClientHandler {
 
   private metadata?: FileMetadata;
   private received: number;
+  private fileDownloader: FileDownloader;
+  private lastSpeedSampleTime: number;
+  private lastSampleReceived: number;
+  private speed: number;
 
   constructor(
     private ws: WebSocket,
-    private dispatcher: RoomEventDispatcher<false>
+    private dispatcher: RoomEventDispatcher<false>,
+    private id: string,
+    private clientKey: string,
+    private turnServer: string
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.dispatcher.connectionStatusChanged(false);
 
-    this.pc = new RTCPeerConnection({ ...iceServers });
+    this.pc = new RTCPeerConnection({
+      iceServers: [
+        ...iceServers.iceServers,
+        { urls: `turn:${turnServer}`, username: id, credential: clientKey },
+      ],
+    });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
     this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
   }
@@ -541,8 +590,6 @@ class ClientHandler {
     }
   }
 
-  private fileDownloader: FileDownloader;
-
   private async handleMetadata(view: Uint8Array) {
     const [name, size, roomName, emoji] = JSON.parse(
       new TextDecoder().decode(view)
@@ -558,10 +605,6 @@ class ClientHandler {
     this.dispatcher.connectionStatusChanged(true);
     this.dispatcher.needsStart(true);
   }
-
-  private lastSpeedSampleTime: number;
-  private lastSampleReceived: number;
-  private speed: number;
 
   private handleChunk(chunk: Uint8Array) {
     // noinspection JSIgnoredPromiseFromCall
