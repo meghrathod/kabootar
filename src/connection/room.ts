@@ -536,7 +536,10 @@ class ClientHandler {
       credential: clientKey,
     });
 
-    this.connectionTimeout = setTimeout(() => {}, 5_000) as unknown as number; // 5s
+    this.connectionTimeout = setTimeout(
+      this.useTurn.bind(this),
+      5_000
+    ) as unknown as number; // 5s
     this.pc = new RTCPeerConnection({
       iceServers: [...iceServers.iceServers],
     });
