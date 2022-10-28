@@ -1,21 +1,26 @@
-# Signalling in P2P File Sharing
+# Rendevouz in P2P File Sharing
 
-## What is the need of a signalling server in a P2P Application?
+## What is the need of a rendevouz server in a P2P Application?
 
-In a P2P file sharing system, peers need to be able to find each other before they can send files. To do this we need to have a way to identify peers. A signalling server is a server that can be used to exchange this information.
+In a P2P file sharing system, peers need to be able to find each other before they can send files. To do this we need to have a way to identify peers. A rendevouz server is a server that can be used to exchange this information.
 
-## How does our Signalling server work?
+## How does our Rendevouz server work?
 
 Whenever a `POST` request is created on the `/room` route, a new room is created.
 
 A room has following four fields:
 
-| Sr. No | Name      | Description                                        | Type                         |
-| ------ | --------- | -------------------------------------------------- | ---------------------------- |
-| 1      | `mKey`    | The master key of the room                         | `string`                     |
-| 2      | `cKey`    | The client key of the room                         | `string`                     |
-| 3      | `Master`  | A websocket connection to the master peer          | `*websocket.Conn`            |
-| 4      | `Clients` | A map of websocket connections to the client peers | `map[string]*websocket.Conn` |
+| Sr. No | Name          | Description                                                 | Type                         |
+| ------ | ------------- | ----------------------------------------------------------- | ---------------------------- |
+| 1      | `mKey`        | The master key of the room                                  | `string`                     |
+| 2      | `cKey`        | The client key of the room                                  | `string`                     |
+| 3      | `TKey`        | The hashed client key for `TURN` server auth                | `[]byte`                     |
+| 4      | `PIN`         | The PIN for the room                                        | `string`                     |
+| 5      | `DiscoveryIP` | The IP address of the peer that is used for local discovery | `string`                     |
+| 6      | `Name`        | The name of the room                                        | `string`                     |
+| 7      | `Emoji`       | The emoji of the room                                       | `string`                     |
+| 8      | `Master`      | A websocket connection to the master peer                   | `*websocket.Conn`            |
+| 9      | `Clients`     | A map of websocket connections to the client peers          | `map[string]*websocket.Conn` |
 
 Once a room has been created a `GET` request is made to the `/ws/:room_id` route with the `mKey` for a master or `cKey` for a client as query parameters. If the room exists, the client is added to the room and a websocket connection is established with the client.
 
