@@ -9,15 +9,10 @@ interface MasterEventDispatcher {
 
 interface ClientEventDispatcher {
   receivePercentageChanged(percentage: number);
-
   connectionStatusChanged(connected: boolean);
-
   needsStart(needs: boolean);
-
   roomMetaChanged(name: string, roomName: string, emoji: string);
-
   connectionSpeed(speed: number);
-
   complete();
 }
 
@@ -529,12 +524,6 @@ class ClientHandler {
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.dispatcher.connectionStatusChanged(false);
-
-    console.log({
-      urls: `turn:${turnServer}`,
-      username: id,
-      credential: clientKey,
-    });
 
     this.pc = new RTCPeerConnection({
       iceServers: [
