@@ -61,7 +61,6 @@ const HomePage: Component = () => {
     }
   }
 
-
   return (
     <div class="h-full flex flex-col items-center justify-center">
       <Title>Kabootar</Title>
