@@ -25,7 +25,7 @@ const HomePage: Component = () => {
     setRoom(room);
     navigate(`/${room.id}#${room.constructHash()}`);
     setShareDisabled(false);
-  }
+  };
 
   const createRoom = () => {
     const input = document.createElement("input");
@@ -59,7 +59,7 @@ const HomePage: Component = () => {
         await handleFile(file);
       }
     }
-  }
+  };
 
   return (
     <div class="h-full flex flex-col items-center justify-center">
@@ -71,11 +71,11 @@ const HomePage: Component = () => {
 
       <div class="h-14" aria-hidden />
 
-      <div class={
-        drag()
-          ? "flex flex-col space-y-5 w-52 sharing-buttons background-element"
-          : "flex flex-col space-y-5 w-52 sharing-buttons foreground-element"
-      }>
+      <div
+        class={`flex flex-col space-y-5 w-52 sharing-buttons transition-all duration-200 ${
+          drag() ? "background-element" : "foreground-element"
+        }`}
+      >
         <PrimaryButton
           class="z-10"
           disabled={shareDisabled()}
@@ -93,22 +93,24 @@ const HomePage: Component = () => {
           Discover
         </SexyButton>
       </div>
-      <div class={
-        drag()
-          ? "fixed inset-0 z-10 flex items-center justify-center foreground-element"
-          : "fixed inset-0 z-10 flex items-center justify-center background-element"
-      }
+      <div
+        class={`fixed inset-0 z-10 items-center justify-center hidden transition-all duration-200 md:block ${
+          drag() ? "foreground-element" : "background-element"
+        }`}
         onDragEnter={handleDrag}
         ondragover={handleDrag}
         onDragLeave={handleDrag}
-        onDrop={handleDrop} >
+        onDrop={handleDrop}
+      >
         <div class="absolute inset-0 bg-black opacity-50" />
         <div class="drop-model rounded-lg shadow-lg">
-          <h1 class="text-2xl font-bold drop-text text-goo">Drop the file here to share.</h1>
+          <h1 class="text-2xl font-bold drop-text text-goo">
+            Drop the file here to share.
+          </h1>
         </div>
       </div>
     </div>
-  )
+  );
 };
 
 export default HomePage;

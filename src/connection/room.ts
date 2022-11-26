@@ -304,7 +304,7 @@ enum ClientMasterSignal {
   TRICKLE_ICE,
 }
 
-const chunkSize = 16 * 1024; // 15 KiB
+const chunkSize = 16 * 1024; // 16 KiB
 
 class MasterClient {
   private channelOpen: boolean;
