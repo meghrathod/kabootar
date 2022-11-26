@@ -3,7 +3,7 @@
   "name": "Kabootar",
   "icons": [
     {
-      "src": "/src/images/icon.png",
+      "src": "/assets/icon.png",
       "type": "image/png",
       "sizes": "512x512"
     }
@@ -19,14 +19,14 @@
       "short_name": "Share",
       "description": "Share a file with your friends.",
       "url": "/",
-      "icons": [{ "src": "/src/images/share.png", "sizes": "512x512" }]
+      "icons": [{ "src": "/assets/share.png", "sizes": "512x512" }]
     },
     {
       "name": "Discover shares",
       "short_name": "Discover",
       "description": "Discover room to receive files.",
       "url": "/discover",
-      "icons": [{ "src": "/src/images/discover.png", "sizes": "512x512" }]
+      "icons": [{ "src": "/assets/discover.png", "sizes": "512x512" }]
     }
   ],
   "description": "Kabootar is a file sharing app that allows you to share files with your friends securely and in a moment through our peer-to-peer technology."
