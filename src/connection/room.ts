@@ -4,16 +4,16 @@ import { baseURL, httpScheme, iceServers, wsScheme } from "../config";
 import { FileDownloader, getFileDownloader } from "../downloader";
 
 interface MasterEventDispatcher {
-  numClientsChanged(n: number);
+  numClientsChanged(n: number): void;
 }
 
 interface ClientEventDispatcher {
-  receivePercentageChanged(percentage: number);
-  connectionStatusChanged(connected: boolean);
-  needsStart(needs: boolean);
-  roomMetaChanged(name: string, roomName: string, emoji: string);
-  connectionSpeed(speed: number);
-  complete();
+  receivePercentageChanged(percentage: number): void;
+  connectionStatusChanged(connected: boolean): void;
+  needsStart(needs: boolean): void;
+  roomMetaChanged(name: string, roomName: string, emoji: string): void;
+  connectionSpeed(speed: number): void;
+  complete(): void;
 }
 
 export type RoomEventDispatcher<Master extends boolean> = Master extends true
@@ -31,8 +31,8 @@ class Room<Master extends boolean> {
     private ws: WebSocket,
     private clientKey: string,
     public file: Master extends true ? File : undefined,
-    private eventDispatcher: RoomEventDispatcher<Master>,
-    private turnServer: string,
+    eventDispatcher: RoomEventDispatcher<Master>,
+    turnServer: string,
     public pin?: string
   ) {
     this.handler = isMaster
