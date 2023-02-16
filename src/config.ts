@@ -3,6 +3,6 @@ export const iceServers: RTCConfiguration = {
 };
 
 export const secure = true;
-export const baseURL = "signaling.staging.kabootar.potatokitty.me";
+export const baseURL = "signaling.kabootar.meghrathod.dev";
 export const httpScheme = secure ? "https://" : "http://";
 export const wsScheme = secure ? "wss://" : "ws://";
