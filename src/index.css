@@ -8,6 +8,8 @@
 body {
   @apply bg-black text-white h-[100vh];
   font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 
 .heading {
