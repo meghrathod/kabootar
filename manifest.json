@@ -1,43 +1,33 @@
 {
-  "short_name": "Kabootar",
-  "name": "Kabootar: Fast & Secure File Sharing",
-  "icons": [
-      {
-          "src": "/assets/icon.png",
-          "type": "image/png",
-          "sizes": "1024x1024"
-      },
-      {
-          "src": "/assets/android-chrome-192x192.png",
-          "sizes": "192x192",
-          "type": "image/png"
-      },
-      {
-          "src": "/assets/android-chrome-512x512.png",
-          "sizes": "512x512",
-          "type": "image/png"
-      }
-  ],
-  "start_url": "/",
-  "background_color": "#000",
-  "display": "standalone",
-  "scope": "/",
-  "theme_color": "#000",
-  "shortcuts": [
-    {
-      "name": "Share a file",
-      "short_name": "Share",
-      "description": "Share a file with your friends.",
-      "url": "/",
-      "icons": [{ "src": "/assets/share.png", "sizes": "512x512" }]
-    },
-    {
-      "name": "Discover shares",
-      "short_name": "Discover",
-      "description": "Discover room to receive files.",
-      "url": "/discover",
-      "icons": [{ "src": "/assets/discover.png", "sizes": "512x512" }]
-    }
-  ],
-  "description": "Kabootar is a file sharing app that allows you to share files with your friends securely and in a moment through our peer-to-peer technology."
+    "short_name": "Kabootar",
+    "name": "Kabootar: Fast & Secure File Sharing",
+    "icons": [
+        {
+            "src": "/assets/Icon_rounded.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        }
+    ],
+    "start_url": "/",
+    "background_color": "#000",
+    "display": "standalone",
+    "scope": "/",
+    "theme_color": "#000",
+    "shortcuts": [
+        {
+            "name": "Share a file",
+            "short_name": "Share",
+            "description": "Share a file with your friends.",
+            "url": "/",
+            "icons": [{ "src": "/assets/share.png", "sizes": "512x512" }]
+        },
+        {
+            "name": "Discover shares",
+            "short_name": "Discover",
+            "description": "Discover room to receive files.",
+            "url": "/discover",
+            "icons": [{ "src": "/assets/discover.png", "sizes": "512x512" }]
+        }
+    ],
+    "description": "Kabootar is a file sharing app that allows you to share files with your friends securely and in a moment through our peer-to-peer technology."
 }
