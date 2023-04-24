@@ -80,12 +80,5 @@ Inside the `signalling` directory:
 1. Run `yarn dev`
 
 ## People
-
-| Name                 | Roll Number |
-| -------------------- | ----------- |
-| Akshit Garg          | 2010110065  |
-| Amaan                | 2010110072  |
-| Ayaan                | 2010110174  |
-| Charuhas Reddy Balam | 2010110204  |
-| Megh Rathod          | 2010110393  |
-| Jigar Italiya        | 2010110319  |
+- Akshit Garg
+- Megh Rathod
