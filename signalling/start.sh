@@ -20,4 +20,12 @@ turn_port = ${TURN_PORT}
 EOF
 
 # Start the Go application
-./main
+# Substitute environment variables in the Nginx config template and output to the final config file
+envsubst '$PORT' < /etc/nginx/conf.d/nginx.conf.template > /etc/nginx/conf.d/default.conf
+
+# Start the Go application in the background
+
+main &
+
+# Start Nginx in the foreground
+nginx -g 'daemon off;'
