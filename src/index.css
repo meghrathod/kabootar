@@ -7,7 +7,11 @@
 
 body {
   @apply bg-black text-white h-[100vh];
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
   /* Disable scrolling and set background to the same even if attempted to scroll */
   overflow: hidden;
   /* Fix even for iOS status bar  */
@@ -24,7 +28,12 @@ body {
 }
 
 .heading {
-  font-family: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
+  font-family:
+    "Public Sans",
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 #root {

@@ -80,5 +80,6 @@ Inside the `signalling` directory:
 1. Run `yarn dev`
 
 ## People
+
 - Akshit Garg
 - Megh Rathod
