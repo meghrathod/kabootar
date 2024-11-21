@@ -37,9 +37,8 @@ COPY signalling/start.sh .
 RUN chmod +x start.sh
 
 # Expose the port the app runs on
-EXPOSE 80 443
+EXPOSE 80 443 18937
 
 # Use the start script as the entry point
 # cat the generated start.sh script to see the contents
-RUN [ "cat", "start.sh"]
 CMD ["/bin/sh", "./start.sh"]
