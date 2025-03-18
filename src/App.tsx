@@ -5,11 +5,13 @@ import type { Component } from "solid-js";
 import HomePage from "./pages/Home";
 import DiscoverPage from "./pages/Discover";
 import SharePage from "./pages/Share";
+import SafariWarning from "./components/SafariWarning";
 
 const App: Component = () => {
   return (
     <MetaProvider>
       <main class="h-full">
+        <SafariWarning />
         <Router>
           <Routes>
             <Route path="/" component={HomePage} />

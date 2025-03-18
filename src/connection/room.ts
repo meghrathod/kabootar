@@ -609,7 +609,7 @@ class ClientHandler {
 
   private handleChunk(chunk: Uint8Array) {
     // noinspection JSIgnoredPromiseFromCall
-    this.fileDownloader.append(chunk);
+    this.fileDownloader.append(chunk.buffer as ArrayBuffer);
     this.received += chunk.length;
 
     const now = Date.now();
