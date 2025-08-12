@@ -79,5 +79,21 @@
             "icons": [{ "src": "/assets/discover.png", "sizes": "512x512" }]
         }
     ],
+    "share_target": {
+        "action": "/share-target",
+        "method": "POST",
+        "enctype": "multipart/form-data",
+        "params": {
+            "title": "title",
+            "text": "text",
+            "url": "url",
+            "files": [
+                {
+                    "name": "files",
+                    "accept": ["*/*"]
+                }
+            ]
+        }
+    },
     "description": "Kabootar is a file sharing app that allows you to share files with your friends securely and in a moment through our peer-to-peer technology."
 }

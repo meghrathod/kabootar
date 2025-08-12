@@ -1,10 +1,11 @@
 import { Title } from "@solidjs/meta";
 import { useNavigate } from "@solidjs/router";
-import { Component, createSignal } from "solid-js";
+import { Component, createSignal, onMount } from "solid-js";
 
 import { PrimaryButton, SexyButton } from "../components/Button";
 import Room from "../connection/room";
 import { numClientsSignal, roomSignal } from "./Share";
+import { takeSharedPayload } from "../utils/shareTarget";
 
 const HomePage: Component = () => {
   const navigate = useNavigate();
@@ -38,6 +39,24 @@ const HomePage: Component = () => {
     });
     input.click();
   };
+
+  onMount(async () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("share-target") === "1") {
+        const payload = await takeSharedPayload();
+        if (payload?.files && payload.files.length > 0) {
+          await handleFile(payload.files[0]);
+        }
+        // Clean up the query param from the address bar
+        const url = new URL(window.location.href);
+        url.searchParams.delete("share-target");
+        window.history.replaceState({}, "", url.toString());
+      }
+    } catch (e) {
+      // ignore
+    }
+  });
 
   const handleDrag = (e: DragEvent) => {
     if (e.type === "dragenter" || e.type === "dragover") {
