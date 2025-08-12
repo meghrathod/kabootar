@@ -1,5 +1,5 @@
-import { getPublicIP } from './ip';
-import { baseURL, wsScheme } from '../config';
+import { getPublicIP } from "./ip";
+import { baseURL, wsScheme } from "../config";
 
 export type DiscoveredRoomItem = {
   id: string;
@@ -14,7 +14,7 @@ export default class Discovery {
     private added: (room: DiscoveredRoomItem) => void,
     private removed: (id: string) => void,
   ) {
-    ws.addEventListener('message', this.messageListener.bind(this));
+    ws.addEventListener("message", this.messageListener.bind(this));
   }
 
   static async connect(
@@ -39,10 +39,10 @@ export default class Discovery {
     try {
       const data = JSON.parse((event as any).data);
       switch (data[0]) {
-        case '0':
+        case "0":
           this.onAddMessage(data);
           break;
-        case '1':
+        case "1":
           this.onRemoveMessage(data);
           break;
       }
@@ -52,17 +52,17 @@ export default class Discovery {
   }
 
   private onAddMessage(data: string[]) {
-    if (data.length < 4 || data[0] !== '0') return;
+    if (data.length < 4 || data[0] !== "0") return;
     this.added({
       id: data[1],
-      background: '#00000011',
+      background: "#00000011",
       name: data[2],
       emoji: data[3],
     });
   }
 
   private onRemoveMessage(data: string[]) {
-    if (data.length < 2 || data[0] !== '1') return;
+    if (data.length < 2 || data[0] !== "1") return;
     this.removed(data[1]);
   }
 }

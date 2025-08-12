@@ -1,5 +1,5 @@
-import { httpScheme, wsScheme, baseURL, iceServers } from '../config';
-import { getFileDownloader } from '../downloader';
+import { httpScheme, wsScheme, baseURL, iceServers } from "../config";
+import { getFileDownloader } from "../downloader";
 
 export type RoomEventDispatcher<Master extends boolean> = Master extends true
   ? { numClientsChanged(n: number): void }
@@ -50,8 +50,8 @@ export default class Room<Master extends boolean> {
       );
     }
 
-    ws.addEventListener('message', this.handleMessage.bind(this));
-    ws.addEventListener('close', this.handleClose.bind(this));
+    ws.addEventListener("message", this.handleMessage.bind(this));
+    ws.addEventListener("close", this.handleClose.bind(this));
   }
 
   static async create(
@@ -59,8 +59,8 @@ export default class Room<Master extends boolean> {
     dispatcher: RoomEventDispatcher<true>,
   ): Promise<Room<true> | undefined> {
     const response = await fetch(`${httpScheme}${baseURL}/room`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
 
@@ -91,7 +91,17 @@ export default class Room<Master extends boolean> {
   ): Promise<Room<false> | undefined> {
     const ws = await this.initWS(id, key, false);
     if (!ws) return undefined;
-    return new Room(false as any, id, '', '', ws[0], key, undefined as any, dispatcher, ws[1]);
+    return new Room(
+      false as any,
+      id,
+      "",
+      "",
+      ws[0],
+      key,
+      undefined as any,
+      dispatcher,
+      ws[1],
+    );
   }
 
   static async getClientKey(id: string, pin: string): Promise<string | void> {
@@ -112,19 +122,19 @@ export default class Room<Master extends boolean> {
     isMaster: boolean,
   ): Promise<[WebSocket, string] | undefined> {
     const ws = new WebSocket(
-      `${wsScheme}${baseURL}/ws/${id}?k=${key}&m=${isMaster ? 't' : 'f'}`,
+      `${wsScheme}${baseURL}/ws/${id}?k=${key}&m=${isMaster ? "t" : "f"}`,
     );
 
     const canConnect = await new Promise<false | [true, string]>((resolve) => {
       function close(_event: any) {
-        ws.removeEventListener('close', close as any);
+        ws.removeEventListener("close", close as any);
         resolve(false);
       }
-      ws.addEventListener('close', close as any);
+      ws.addEventListener("close", close as any);
       function message(event: any) {
         try {
           const data = JSON.parse(event.data);
-          if (data[0] === '-1') {
+          if (data[0] === "-1") {
             resolve([true, data[1]] as any);
           } else {
             resolve(false);
@@ -132,10 +142,10 @@ export default class Room<Master extends boolean> {
         } catch (e) {
           resolve(false);
         } finally {
-          ws.removeEventListener('message', message as any);
+          ws.removeEventListener("message", message as any);
         }
       }
-      ws.addEventListener('message', message as any);
+      ws.addEventListener("message", message as any);
     });
 
     if (canConnect) return [ws, (canConnect as any)[1]];
@@ -157,20 +167,20 @@ export default class Room<Master extends boolean> {
   }
 
   private sendSignal(id: string, signal: string) {
-    this.ws.send(JSON.stringify(['0', id, signal]));
+    this.ws.send(JSON.stringify(["0", id, signal]));
   }
 
   private handleMessage(event: MessageEvent) {
     const data = JSON.parse((event as any).data);
     if (data.length < 1) return;
     switch (data[0]) {
-      case '0':
+      case "0":
         (this.handler as any).handleServerMessage(data);
         break;
-      case '1':
+      case "1":
         // left
         break;
-      case '2':
+      case "2":
         // msg
         break;
       default:
@@ -204,15 +214,22 @@ class MasterClient {
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...(iceServers.iceServers || []),
-        { urls: `turn:${turnServer}?transport=tcp`, username: roomID, credential: clientKey },
+        {
+          urls: `turn:${turnServer}?transport=tcp`,
+          username: roomID,
+          credential: clientKey,
+        },
       ],
-      iceTransportPolicy: 'all',
+      iceTransportPolicy: "all",
     });
-    this.pc.addEventListener('icecandidate', this.onIceCandidate.bind(this));
-    this.pc.addEventListener('connectionstatechange', this.onConnectionStateChange.bind(this));
+    this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
+    this.pc.addEventListener(
+      "connectionstatechange",
+      this.onConnectionStateChange.bind(this),
+    );
 
-    this.dataChannel = this.pc.createDataChannel('file');
-    this.dataChannel.binaryType = 'arraybuffer';
+    this.dataChannel = this.pc.createDataChannel("file");
+    this.dataChannel.binaryType = "arraybuffer";
     this.dataChannel.onopen = () => {};
     this.dataChannel.onmessage = (e) => this.handleDataChannelMessage(e as any);
     this.dataChannel.bufferedAmountLowThreshold = 1 << 20;
@@ -233,19 +250,25 @@ class MasterClient {
   }
 
   private onConnectionStateChange() {
-    if (this.pc.connectionState === 'failed' || this.pc.connectionState === 'closed') {
+    if (
+      this.pc.connectionState === "failed" ||
+      this.pc.connectionState === "closed"
+    ) {
       this.onClose();
     }
   }
 
   private sendFile() {
     const reader = new FileReader();
-    reader.addEventListener('load', (event) => {
+    reader.addEventListener("load", (event) => {
       const buf = (event.target as any).result as ArrayBuffer;
       this.dataChannel.send(buf);
       this.offset += buf.byteLength;
       if (this.offset < this.file.size) {
-        if (this.dataChannel.bufferedAmount <= this.dataChannel.bufferedAmountLowThreshold) {
+        if (
+          this.dataChannel.bufferedAmount <=
+          this.dataChannel.bufferedAmountLowThreshold
+        ) {
           readChunk(this.offset);
         } else {
           this.dataChannel.onbufferedamountlow = () => readChunk(this.offset);
@@ -259,12 +282,12 @@ class MasterClient {
   }
 
   private handleDataChannelMessage(event: MessageEvent<string>) {
-    if ((event as any).data === 'ready') this.sendFile();
+    if ((event as any).data === "ready") this.sendFile();
   }
 
   public handleServerMessage(data: any[]) {
     // [2, clientID, msg]
-    if (data[0] !== '2') return;
+    if (data[0] !== "2") return;
     const clientID = data[1];
     const msg = JSON.parse(data[2]);
     if (msg.t === 0) {
@@ -284,7 +307,7 @@ class ClientHandler {
   private pc: RTCPeerConnection;
   private dataChannel?: RTCDataChannel;
   private metadata?: { name: string; size: number };
-  private downloader = getFileDownloader('file', 0);
+  private downloader = getFileDownloader("file", 0);
   private downloaderInitialized = false;
   private received = 0;
   private lastSpeedSampleTime = Date.now();
@@ -300,23 +323,29 @@ class ClientHandler {
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...(iceServers.iceServers || []),
-        { urls: `turn:${turnServer}?transport=tcp`, username: id, credential: clientKey },
+        {
+          urls: `turn:${turnServer}?transport=tcp`,
+          username: id,
+          credential: clientKey,
+        },
       ],
-      iceTransportPolicy: 'all',
+      iceTransportPolicy: "all",
     });
-    this.pc.addEventListener('icecandidate', this.onIceCandidate.bind(this));
-    this.pc.addEventListener('datachannel', this.onDataChannel.bind(this));
+    this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
+    this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
   }
 
   private onIceCandidate(event: RTCPeerConnectionIceEvent) {
     if (event.candidate) {
-      this.ws.send(JSON.stringify(['0', '', JSON.stringify({ t: 1, c: event.candidate })]));
+      this.ws.send(
+        JSON.stringify(["0", "", JSON.stringify({ t: 1, c: event.candidate })]),
+      );
     }
   }
 
   private onDataChannel(event: RTCDataChannelEvent) {
     this.dataChannel = event.channel;
-    this.dataChannel.binaryType = 'arraybuffer';
+    this.dataChannel.binaryType = "arraybuffer";
     this.dataChannel.onmessage = (e) => this.onDataMessage(e as any);
   }
 
@@ -324,7 +353,9 @@ class ClientHandler {
     const buf = (e as any).data as ArrayBuffer;
     const view = new Uint8Array(buf);
     if (!this.metadata) {
-      const [name, size, roomName, emoji] = JSON.parse(new TextDecoder().decode(view));
+      const [name, size, roomName, emoji] = JSON.parse(
+        new TextDecoder().decode(view),
+      );
       this.metadata = { name, size };
       this.dispatcher.roomMetaChanged(name, roomName, emoji);
       this.dispatcher.connectionStatusChanged(true);
@@ -336,12 +367,16 @@ class ClientHandler {
       this.received += view.length;
       const now = Date.now();
       if (now > this.lastSpeedSampleTime + 1000) {
-        const speed = ((this.received - this.lastSampleReceived) * 1000) / (now - this.lastSpeedSampleTime);
+        const speed =
+          ((this.received - this.lastSampleReceived) * 1000) /
+          (now - this.lastSpeedSampleTime);
         this.lastSampleReceived = this.received;
         this.lastSpeedSampleTime = now;
         this.dispatcher.connectionSpeed(speed);
       }
-      this.dispatcher.receivePercentageChanged(Math.floor((this.received * 100) / (this.metadata.size || 1)));
+      this.dispatcher.receivePercentageChanged(
+        Math.floor((this.received * 100) / (this.metadata.size || 1)),
+      );
       if (this.received === this.metadata.size) {
         await this.downloader.finalize();
         this.dispatcher.complete();
@@ -351,14 +386,18 @@ class ClientHandler {
 
   public async handleServerMessage(data: any[]) {
     // [0] SM joined => create answer or signalling
-    if (data[0] === '2') {
+    if (data[0] === "2") {
       const msg = JSON.parse(data[2]);
       if (msg.t === 0) {
         await this.pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
         const answer = await this.pc.createAnswer();
         await this.pc.setLocalDescription(answer);
         this.ws.send(
-          JSON.stringify(['0', '', JSON.stringify({ t: 0, sdp: this.pc.localDescription })]),
+          JSON.stringify([
+            "0",
+            "",
+            JSON.stringify({ t: 0, sdp: this.pc.localDescription }),
+          ]),
         );
       } else if (msg.t === 1) {
         await this.pc.addIceCandidate(new RTCIceCandidate(msg.c));
@@ -367,13 +406,16 @@ class ClientHandler {
   }
 
   public async dispatch(data: string) {
-    if (data === 'ready') {
+    if (data === "ready") {
       if (!this.metadata) return;
-      this.downloader = getFileDownloader(this.metadata.name, this.metadata.size);
+      this.downloader = getFileDownloader(
+        this.metadata.name,
+        this.metadata.size,
+      );
       await this.downloader.initialize();
       this.downloaderInitialized = true;
       this.dispatcher.needsStart(false);
-      this.dataChannel?.send('ready');
+      this.dataChannel?.send("ready");
     }
   }
 }

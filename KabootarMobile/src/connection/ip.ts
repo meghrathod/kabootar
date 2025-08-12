@@ -1,4 +1,4 @@
-import { iceServers } from '../config';
+import { iceServers } from "../config";
 
 const ipRegex = /\d{1,3}\.\d{1,3}\.\d{1,3}.\d{1,3}/;
 
@@ -7,7 +7,7 @@ export function getPublicIP(): Promise<string> {
     const pc = new RTCPeerConnection({ ...iceServers });
 
     let address: string | undefined;
-    pc.addEventListener('icecandidate', (event) => {
+    pc.addEventListener("icecandidate", (event) => {
       if (!event.candidate) {
         return;
       }
@@ -22,33 +22,33 @@ export function getPublicIP(): Promise<string> {
       }
     });
 
-    pc.addEventListener('icegatheringstatechange', () => {
-      if (pc.iceGatheringState === 'complete') {
+    pc.addEventListener("icegatheringstatechange", () => {
+      if (pc.iceGatheringState === "complete") {
         pc.close();
         if (address !== undefined) {
           resolve(address);
         } else {
-          reject('unable to get public IP');
+          reject("unable to get public IP");
         }
       }
     });
 
-    pc.createDataChannel('dummy');
+    pc.createDataChannel("dummy");
     await pc.setLocalDescription(await pc.createOffer());
   });
 }
 
 function isPublicIP(ip: string): boolean {
-  if (ip.startsWith('10.')) {
+  if (ip.startsWith("10.")) {
     return false;
   }
 
-  if (ip.startsWith('192.168.')) {
+  if (ip.startsWith("192.168.")) {
     return false;
   }
 
-  if (ip.startsWith('172.')) {
-    const [, b] = ip.split('.');
+  if (ip.startsWith("172.")) {
+    const [, b] = ip.split(".");
     try {
       const bNum = Number.parseInt(b);
       if (bNum >= 16 && bNum < 32) {
