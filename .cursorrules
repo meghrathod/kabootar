@@ -1,0 +1,114 @@
+Repo guide for AI (Cursor)
+
+Purpose
+
+- Make it fast to locate code, extend features, and avoid redundant searches.
+
+Tech overview
+
+- Frontend: SolidJS + Vite in `src/`
+- Signalling: Go (Fiber + WebSocket + TURN via pion) in `signalling/`
+- Transport: WebRTC data channel, discovery via WebSocket, TURN bootstrapped from signalling
+
+Run locally
+
+- Signalling (from `signalling/`):
+  - Create `kabootar.toml` (copy `kabootar.example.toml`), update `listen_address`, `cors_endpoint`, TURN values
+  - Build: `go build -o out/rendezvous ./cmd/signalling`
+  - Run: `./out/rendezvous`
+- Web app (from repo root):
+  - `yarn install --frozen-lockfile`
+  - Configure `src/config.ts`: set `secure`, `baseURL`, derived `httpScheme/wsScheme`
+  - `yarn dev`
+
+Where things are
+
+- Frontend
+  - `src/config.ts`: STUN list, `secure`, `baseURL`, `httpScheme`, `wsScheme`
+  - `src/connection/room.ts`: main P2P logic
+    - `Room.create` → POST `/room` then WS `/ws/:id?k=<mKey>&m=t`
+    - `Room.joinDirect` → WS `/ws/:id?k=<cKey>&m=f`
+    - First WS server message is `["-1", turnURL]`
+    - `MasterHandler` creates offer, sends metadata then file chunks (16 KiB)
+    - `ClientHandler` answers and downloads (Stream SW → Blob fallback)
+  - `src/connection/discovery.ts`: WS `GET /discover?ip=<public-ip>`; handle add/remove notifications
+  - `src/connection/ip.ts`: extracts public IP using STUN candidates
+  - `src/downloader/*`: download strategies
+  - Pages: `src/pages/Home.tsx` (create share), `src/pages/Discover.tsx` (LAN discovery + PIN), `src/pages/Share.tsx` (sender/receiver view)
+  - Components: `PinEntryDialog`, `QRDialog`, `DiscoveredRoom`, buttons
+- Signalling (Go)
+  - Entry: `signalling/cmd/signalling/main.go`
+  - Web init and routes: `signalling/web/web.go`
+  - Core handler & routing: `signalling/web/handler.go`
+  - WS guard: `signalling/web/signalling.go`
+  - Room state: `signalling/web/room.go`
+  - Protocol enums/utils: `signalling/web/protocol.go`
+  - REST endpoints: `signalling/web/create_room.go` (POST /room), `signalling/web/discovery.go` (GET /room, WS /discover)
+  - TURN bootstrap: `signalling/web/turn.go` (UDP TURN server, auth)
+  - Config: `signalling/config/config.go` (+ `kabootar.toml`)
+
+HTTP and WS API (quick reference)
+
+- POST `/room` (body: `["t"|"f", ip?]`)
+  - Response: `[roomID, mKey, cKey, name, pin, emoji]`
+  - If body indicates public IP, room is discoverable for that IP
+- GET `/room?id=<roomID>&pin=<pin>` → `[cKey]` (client retrieves key after PIN)
+- WS `/ws/:room_id?k=<key>&m=t|f`
+  - First server → client message: `["-1", turnHost:port]`
+  - Server → Master
+    - Join: `["0", clientID]`
+    - Leave: `["1", clientID]`
+    - Relay client signal: `["2", clientID, msg]`
+  - Master → Server: `["0", clientID, msg]`
+  - Server → Client: `["0", msg]`, Gone: `["1]`
+  - Client → Server: `["0", msg]`
+- WS `/discover?ip=<public-ip>`
+  - Server → Client: add `["0", id, name, emoji]`, remove `["1", id]`
+
+WebRTC specifics
+
+- Data channel label: `"d"`
+- Metadata (first message over data channel): JSON `[fileName, fileSize, roomName, emoji]` as ArrayBuffer
+- Chunk size: 16 KiB, backpressure via `bufferedAmountLowThreshold`
+- ICE servers: Google public STUN + dynamic TURN from server:
+  - TURN URL sent via WS first message; username = roomID (master) / id (client), credential = `cKey`
+
+Discovery flow (high level)
+
+- Sender creates room → server may mark discoverable under sender public IP
+- Discover page gets own public IP via STUN, opens `/discover` WS
+- Server pushes rooms for that IP; receiver selects room, enters PIN; server returns `cKey`; receiver navigates to `/:id#k=<cKey>` and joins WS
+
+Important constants/labels
+
+- Channel label: `d`
+- Config toggles: `secure`, `baseURL`, `httpScheme`, `wsScheme`
+- Safari/iOS file size limit logic in `src/utils/browser.ts` (2GB)
+
+Common tasks → where to edit
+
+- Change server host/ports: `src/config.ts` + signalling `kabootar.toml`
+- Add/alter WS message types: `signalling/web/protocol.go` + client handlers in `src/connection/room.ts`
+- Modify discovery behavior: `signalling/web/discovery.go` + `src/connection/discovery.ts`
+- Alter TURN behavior: `signalling/web/turn.go` and how TURN URL is consumed in `src/connection/room.ts`
+- UI flow or routing: `src/pages/*.tsx` and `src/App.tsx`
+- Downloader behavior: `src/downloader/*`
+
+Conventions
+
+- Messages are string arrays for compactness; keep indices consistent with enums in `signalling/web/protocol.go`
+- Keep `Room` class as the single entry API for frontend P2P actions
+- Prefer small composable components in `src/components/`
+- Type additions go in `src/types/`
+
+Checks before shipping
+
+- Frontend builds: `yarn build`
+- Signalling runs and CORS set correctly for FE origin
+- `src/config.ts` points to correct host and (ws|http) scheme
+
+Search hints
+
+- “Where is X WS message handled?” → start at `signalling/web/protocol.go`, then `handler.go`, then `src/connection/room.ts`
+- “How is discover add/remove emitted?” → `signalling/web/discovery.go` (notify) and `src/connection/discovery.ts`
+- “How does file transfer start?” → data channel open → metadata → client sets up downloader → user clicks Start → client sends `"ready"` → master starts chunking
