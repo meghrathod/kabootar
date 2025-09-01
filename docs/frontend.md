@@ -28,19 +28,16 @@ Used everywhere the app talks to the signalling server and during WebRTC peer co
 Public API:
 
 - `Room.create(file, dispatcher)` → Promise<Room<true> | undefined>
-
   - POST `/room` with discovery params
   - Receives `[roomID, mKey, cKey, roomName, pin, emoji]`
   - Opens WS `/ws/:id?k=<mKey>&m=t`, expects first message `[-1, turnHost:port]`
   - Returns a master `Room` instance (sender)
 
 - `Room.joinDirect(id, key, dispatcher)` → Promise<Room<false> | undefined>
-
   - Opens WS `/ws/:id?k=<cKey>&m=f`, expects first message `[-1, turnHost:port]`
   - Returns a client `Room` instance (receiver)
 
 - `Room.getClientKey(id, pin)` → Promise<string | void>
-
   - GET `/room?id=<id>&pin=<pin>` → `[cKey]`
 
 - `room.constructHash()` → `"k=<clientKey>"`
@@ -57,7 +54,6 @@ Event dispatchers (callbacks provided by pages):
 Handled by `MasterHandler` once a master `Room` is created:
 
 - Listens to server WS messages:
-
   - `["0", clientID]` → a client joined; instantiate `MasterClient`
   - `["1", clientID]` → client left; close and remove
   - `["2", clientID, msg]` → signalling from that client
@@ -108,7 +104,6 @@ Handled by `ClientHandler` after `joinDirect` or a share link open:
 Interface: `FileDownloader { initialize, append, finalize }`.
 
 - `StreamFileDownloader`
-
   - Preferred when a service worker is active and not Safari
   - Creates a `ReadableStream` and posts a message to the SW with `{ name, size, seed, port, stream }`
   - Receives a one-time URL from SW; loads it in a hidden iframe to trigger a streamed download with correct headers
@@ -126,7 +121,6 @@ Registered in `src/index.tsx` as `/sw.js` with scope `/`.
 Responsibilities:
 
 - Streaming downloads
-
   - Maintains a map of in-flight stream URLs → metadata
   - Receives `type: "stream"` messages to register a new stream URL
   - Serves `GET /stream/<seed>` with proper `Content-Type`, `Content-Length`, and `Content-Disposition`, responding with the provided `ReadableStream`
