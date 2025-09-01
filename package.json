@@ -5,7 +5,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "signalling:build": "cd signalling && go build -o out/rendezvous ./cmd/signalling",
+    "signalling:start": "cd signalling && ./out/rendezvous",
+    "signalling:start:bg": "sh -c 'cd signalling && ./out/rendezvous >/tmp/kabootar-signalling.log 2>&1 & echo $! > /tmp/kabootar-signalling.pid && echo PID $(cat /tmp/kabootar-signalling.pid)'",
+    "signalling:stop": "sh -c 'test -f /tmp/kabootar-signalling.pid && kill $(cat /tmp/kabootar-signalling.pid) && rm -f /tmp/kabootar-signalling.pid || echo signalling not running'",
+    "signalling:logs": "tail -f /tmp/kabootar-signalling.log",
+    "signalling:build-run": "yarn signalling:build && yarn signalling:start",
+    "signalling:build-run:bg": "yarn signalling:build && yarn signalling:start:bg",
+    "build:all": "yarn signalling:build && yarn build",
+    "run:all": "yarn signalling:start:bg && yarn dev"
   },
   "license": "Private",
   "devDependencies": {
