@@ -34,10 +34,11 @@ Public API:
   - Opens WS `/ws/:id?k=<mKey>&m=t`, expects first message `[-1, turnHost:port]`
   - Returns a master `Room` instance (sender)
 
-- `Room.joinDirect(id, key, dispatcher)` → Promise<Room<false> | undefined>
+- `Room.joinDirect(id, key, dispatcher)` → Promise<{ room?: Room<false>; error?: string }>
 
   - Opens WS `/ws/:id?k=<cKey>&m=f`, expects first message `[-1, turnHost:port]`
-  - Returns a client `Room` instance (receiver)
+  - On failure receives a terminal error `[-2, reason]` and returns `{ error: reason }`
+  - Returns `{ room }` with a client `Room` instance (receiver) on success
 
 - `Room.getClientKey(id, pin)` → Promise<string | void>
 
@@ -85,7 +86,7 @@ Handled by `ClientHandler` after `joinDirect` or a share link open:
   - Sets `needsStart(true)`; when user clicks start → `dispatch("ready")` → initialize downloader and send `"ready"`
 - Signalling WS messages:
   - `["0", msg]` → signalling from master; handles OFFER and TRICKLE_ICE
-  - `["1"]` → master gone; mark disconnected
+  - `["1"]` → master gone; mark disconnected and surface `masterGone()` callback
 - Tracks progress, instantaneous speed, and completion
 
 ## Discovery (`src/connection/discovery.ts`)
@@ -166,6 +167,16 @@ Responsibilities:
 - If a `Room` is present (sender) → shows share UI and peer count; otherwise attempts to join as client using URL hash
 - Client UI shows metadata, connection status, explicit start button, progress, and speed; dispatches `ready` to start receiving
 - Cleans up by closing `Room` on unload
+- Handles connection failure reasons and navigates accordingly:
+  - `room-not-found` for invalid/expired link
+  - `room-unavailable` when the sender isn’t connected yet
+  - `room-closed` when the sender disconnects while on the page
+
+### Error pages
+
+- `RoomNotFound.tsx` → invalid/expired link
+- `RoomUnavailable.tsx` → sender not connected yet
+- `RoomClosed.tsx` → sender closed the room
 
 ## Components
 

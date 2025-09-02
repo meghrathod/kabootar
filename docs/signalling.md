@@ -60,6 +60,7 @@ Defined in `signalling/web/room.go` and managed by `signalling/web/handler.go`.
 - Destruction
   - When the master disconnects: server notifies all clients with a "gone" message and closes them; the room is removed, and discovery subscribers are notified of removal.
   - When a client disconnects: server notifies the master of the departure; the room remains.
+  - There is no server-side idle timeout: a room lives as long as its master stays connected. If masters disconnect due to hosting/network idle limits, the room is removed immediately.
 
 ## TURN bootstrap
 
@@ -102,6 +103,12 @@ On successful join the server immediately sends the TURN hint:
 ```
 
 Then the server relays signalling messages bidirectionally according to the protocol below.
+
+On join failure the server emits a terminal error frame before closing the socket so the client can branch UI:
+
+```json
+["-2", "room_not_found" | "invalid_key" | "missing_key" | "master_exists" | "master_absent"]
+```
 
 ### Message framing
 
