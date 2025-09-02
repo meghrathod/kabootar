@@ -38,7 +38,6 @@ All WebSocket routes are guarded by `InitializeWS` which rejects plain HTTP (400
 Defined in `signalling/web/room.go` and managed by `signalling/web/handler.go`.
 
 - Fields
-
   - `ID` (string): Room identifier
   - `MKey` (string): Master key (authorizes the sender/owner)
   - `CKey` (string): Client key (authorizes any receiver)
@@ -51,7 +50,6 @@ Defined in `signalling/web/room.go` and managed by `signalling/web/handler.go`.
   - `Clients` (map-like): Connected clients keyed by generated `clientID`
 
 - Creation (`POST /room`)
-
   - Body: JSON array `[("t"|"f"), ip?]`
     - If first element is `"t"`, second element must be the creator's public IP. The server marks the room discoverable only if `ip` is a valid public IP.
   - Response: JSON array `[roomID, mKey, cKey, name, pin, emoji]`
