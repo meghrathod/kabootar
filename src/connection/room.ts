@@ -14,6 +14,7 @@ interface ClientEventDispatcher {
   roomMetaChanged(name: string, roomName: string, emoji: string): void;
   connectionSpeed(speed: number): void;
   complete(): void;
+  masterGone?(): void;
 }
 
 export type RoomEventDispatcher<Master extends boolean> = Master extends true
@@ -73,7 +74,7 @@ class Room<Master extends boolean> {
       await response.json();
 
     const ws = await this.initWS(roomID, masterKey, true);
-    if (ws === undefined) {
+    if (!ws.ok) {
       return undefined;
     }
 
@@ -82,11 +83,11 @@ class Room<Master extends boolean> {
       roomID,
       roomName,
       emoji,
-      ws[0],
+      ws.ws,
       clientKey,
       file,
       dispatcher,
-      ws[1],
+      ws.turn,
       pin,
     );
   }
@@ -95,24 +96,26 @@ class Room<Master extends boolean> {
     id: string,
     key: string,
     dispatcher: RoomEventDispatcher<false>,
-  ): Promise<Room<false> | undefined> {
+  ): Promise<{ room?: Room<false>; error?: string }> {
     const ws = await this.initWS(id, key, false);
-    if (ws === undefined) {
-      return undefined;
+    if (!ws.ok) {
+      return { error: ws.reason };
     }
 
-    return new Room(
-      false,
-      id,
-      "",
-      "",
-      ws[0],
-      key,
-      undefined,
-      dispatcher,
-      ws[1],
-      undefined,
-    );
+    return {
+      room: new Room(
+        false,
+        id,
+        "",
+        "",
+        ws.ws,
+        key,
+        undefined,
+        dispatcher,
+        ws.turn,
+        undefined,
+      ),
+    };
   }
 
   static async getClientKey(id: string, pin: string): Promise<string | void> {
@@ -135,15 +138,20 @@ class Room<Master extends boolean> {
     id: string,
     key: string,
     isMaster: boolean,
-  ): Promise<[WebSocket, string] | undefined> {
+  ): Promise<
+    | { ok: true; ws: WebSocket; turn: string }
+    | { ok: false; reason: string }
+  > {
     const ws = new WebSocket(
       `${wsScheme}${baseURL}/ws/${id}?k=${key}&m=${isMaster ? "t" : "f"}`,
     );
 
-    const canConnect = await new Promise<false | [true, string]>((resolve) => {
+    const canConnect = await new Promise<
+      { ok: true; turn: string } | { ok: false; reason: string }
+    >((resolve) => {
       function close(_event: CloseEvent) {
         ws.removeEventListener("close", close);
-        resolve(false);
+        resolve({ ok: false, reason: "closed" });
       }
 
       ws.addEventListener("close", close);
@@ -152,13 +160,15 @@ class Room<Master extends boolean> {
         try {
           const data = JSON.parse(event.data);
           if (data[0] === "-1") {
-            resolve([true, data[1]]);
+            resolve({ ok: true, turn: data[1] });
+          } else if (data[0] === "-2") {
+            resolve({ ok: false, reason: data[1] || "unknown" });
           } else {
-            resolve(false);
+            resolve({ ok: false, reason: "unknown" });
           }
         } catch (e) {
           console.error(e);
-          resolve(false);
+          resolve({ ok: false, reason: "parse_error" });
         } finally {
           ws.removeEventListener("message", message);
         }
@@ -167,15 +177,15 @@ class Room<Master extends boolean> {
       ws.addEventListener("message", message);
     });
 
-    if (canConnect) {
-      return [ws, canConnect[1]];
+    if (canConnect.ok) {
+      return { ok: true, ws, turn: canConnect.turn };
     }
 
     if (ws.readyState !== ws.CLOSED || ws.readyState !== ws.CLOSING) {
       ws.close();
     }
 
-    return undefined;
+    return { ok: false, reason: canConnect.reason };
   }
 
   constructHash() {
@@ -752,6 +762,9 @@ class ClientHandler {
 
   private handleGone(_data: string[]) {
     this.dispatcher.connectionStatusChanged(false);
+    if (this.dispatcher.masterGone) {
+      this.dispatcher.masterGone();
+    }
   }
 }
 

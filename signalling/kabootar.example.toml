@@ -1,6 +1,7 @@
 listen_address = "0.0.0.0:5000"
 cors_endpoint = "http://localhost:3000"
-turn_realm = "localhost:3000"
+# TURN realm is a host/domain used as the TURN realm and hint host (no port)
+turn_realm = "localhost"
 turn_listen_ip = "0.0.0.0"
 public_ip = "0.0.0.0"
 turn_port = 18937

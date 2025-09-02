@@ -304,8 +304,7 @@ const SharePage: Component = () => {
 
         const id = routerParams.id;
         const key = params.get("k");
-
-        const newRoom = await Room.joinDirect(id, key, {
+        const res = await Room.joinDirect(id, key, {
           roomMetaChanged(name: string, roomName: string, emoji: string) {
             console.log(roomName, emoji);
             setFileName(name);
@@ -327,9 +326,25 @@ const SharePage: Component = () => {
           complete() {
             navigate("/", { replace: true });
           },
+          masterGone() {
+            navigate("/room-closed", { replace: true });
+          },
         });
-        if (newRoom !== undefined) {
-          setRoom(newRoom);
+        if (res.room) {
+          setRoom(res.room);
+        } else if (res.error) {
+          switch (res.error) {
+            case "room_not_found":
+            case "invalid_key":
+            case "missing_key":
+              navigate("/room-not-found", { replace: true });
+              break;
+            case "master_absent":
+              navigate("/room-unavailable", { replace: true });
+              break;
+            default:
+              navigate("/room-unavailable", { replace: true });
+          }
         }
       }
     }, 0);
