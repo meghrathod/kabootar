@@ -27,4 +27,3 @@ const RoomClosed: Component = () => {
 };
 
 export default RoomClosed;
-

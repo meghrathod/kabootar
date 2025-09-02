@@ -27,4 +27,3 @@ const RoomNotFound: Component = () => {
 };
 
 export default RoomNotFound;
-

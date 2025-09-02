@@ -22,7 +22,9 @@ const RoomUnavailable: Component = () => {
           a moment.
         </p>
         <div class="w-full flex gap-2 justify-end">
-          <PrimaryButton onClick={() => navigate("/discover")}>Discover</PrimaryButton>
+          <PrimaryButton onClick={() => navigate("/discover")}>
+            Discover
+          </PrimaryButton>
           <PrimaryButton onClick={retry}>Retry</PrimaryButton>
         </div>
       </div>
@@ -31,4 +33,3 @@ const RoomUnavailable: Component = () => {
 };
 
 export default RoomUnavailable;
-
