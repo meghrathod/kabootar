@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "Kabootar Mobile",
+    "slug": "kabootar-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "kabootar",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.kabootar.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Camera access is required for scanning QR codes and enabling WebRTC.",
+        "NSMicrophoneUsageDescription": "Microphone access may be required by WebRTC.",
+        "NSLocalNetworkUsageDescription": "Local network access is used to discover and connect to peers.",
+        "NSBonjourServices": [
+          "_http._tcp",
+          "_https._tcp"
+        ]
+      }
+    },
+    "android": {
+      "package": "dev.kabootar.mobile",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MANAGE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-barcode-scanner"
+      ],
+      [
+        "expo-file-system"
+      ],
+      [
+        "expo-dev-client"
+      ]
+    ]
+  }
+}
