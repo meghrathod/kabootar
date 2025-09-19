@@ -1,44 +1,46 @@
-# Use the official Golang image to create a build artifact.
-FROM golang:1.18 as builder
+# Build the signalling server binary
+FROM golang:1.18 AS signalling-builder
 
 WORKDIR /app
 
-# Copy the Go Modules manifests
 COPY signalling/go.mod signalling/go.sum ./
-# Download the dependencies
 RUN go mod download
 
-# Copy the source code from the signalling directory
-COPY signalling/ .
-
-# Build the application
+COPY signalling/ ./
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/signalling
 
-# Use Nginx image
+# Build the frontend assets
+FROM node:18-alpine AS frontend-builder
+
+WORKDIR /app
+
+RUN npm install -g yarn@1.22.22
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --non-interactive
+
+COPY tsconfig.json vite.config.ts tailwind.config.js postcss.config.js ./
+COPY index.html manifest.json ./
+COPY public ./public
+COPY src ./src
+
+RUN yarn build
+
+# Final runtime image with Nginx and the signalling server
 FROM nginx:alpine
 
-# Remove the default Nginx configuration file
-RUN rm /etc/nginx/conf.d/default.conf
+RUN rm /etc/nginx/conf.d/default.conf \
+    && apk --no-cache add ca-certificates gettext
 
-# Copy a new configuration file from your project
+WORKDIR /app
+
+COPY --from=signalling-builder /app/main /usr/local/bin/main
+COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/nginx.conf.template
+COPY signalling/start.sh ./start.sh
 
-RUN apk --no-cache add ca-certificates
+RUN chmod +x ./start.sh
 
-WORKDIR /root/
-
-# Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/main /usr/local/bin/main
-
-# Copy the start.sh script
-COPY signalling/start.sh .
-
-# Ensure start.sh is executable
-RUN chmod +x start.sh
-
-# Expose the port the app runs on
 EXPOSE 80 443 18937
 
-# Use the start script as the entry point
-# cat the generated start.sh script to see the contents
 CMD ["/bin/sh", "./start.sh"]

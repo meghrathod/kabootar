@@ -79,6 +79,40 @@ Inside the `signalling` directory:
 1. Run `yarn install --frozen-lockfile`
 1. Run `yarn dev`
 
+## Automated builds and deployments
+
+The repository ships with a GitHub Actions workflow in
+`.github/workflows/deploy.yml` that builds, publishes and deploys the combined
+Nginx/signalling container whenever changes land on `main`.
+
+### Required GitHub secrets
+
+Add the following secrets under **Settings → Secrets and variables → Actions**:
+
+| Secret | Description |
+| ------ | ----------- |
+| `REGISTRY` | Registry host (for example `ghcr.io` or `docker.io`). |
+| `IMAGE_REPOSITORY` | Repository path inside the registry (`owner/kabootar`). |
+| `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` | Credentials used to push and pull the image. |
+| `SSH_HOST` / `SSH_USER` / `SSH_PRIVATE_KEY` | SSH connection details for the target VM. |
+| `DEPLOY_DIR` | Absolute path on the VM where the compose file and `.env` live. |
+
+If you store the image in GitHub Container Registry you can create a fine-grained
+PAT with `packages:write` scope and use it for the registry credentials.
+
+### Preparing the VM
+
+1. Install Docker Engine and the Docker Compose v2 plugin.
+2. Create the directory referenced by `DEPLOY_DIR` (for example `/opt/kabootar`).
+3. Copy `deploy/.env.example` to `.env` inside that directory and update the
+   values with the public hostname, TURN settings and any TURN credentials.
+   GitHub Actions will manage the `IMAGE` entry automatically.
+4. Ensure the deployment user can run `docker` commands without sudo.
+
+The workflow copies `deploy/docker-compose.yml` to the VM, pulls the freshly
+published image and runs `docker compose up -d --remove-orphans`, so the
+signalling server and frontend are served together via the Nginx container.
+
 ## People
 
 - Akshit Garg
