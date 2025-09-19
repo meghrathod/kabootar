@@ -89,13 +89,13 @@ Nginx/signalling container whenever changes land on `main`.
 
 Add the following secrets under **Settings → Secrets and variables → Actions**:
 
-| Secret | Description |
-| ------ | ----------- |
-| `REGISTRY` | Registry host (for example `ghcr.io` or `docker.io`). |
-| `IMAGE_REPOSITORY` | Repository path inside the registry (`owner/kabootar`). |
-| `REGISTRY_USERNAME` / `REGISTRY_PASSWORD` | Credentials used to push and pull the image. |
-| `SSH_HOST` / `SSH_USER` / `SSH_PRIVATE_KEY` | SSH connection details for the target VM. |
-| `DEPLOY_DIR` | Absolute path on the VM where the compose file and `.env` live. |
+| Secret                                      | Description                                                     |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| `REGISTRY`                                  | Registry host (for example `ghcr.io` or `docker.io`).           |
+| `IMAGE_REPOSITORY`                          | Repository path inside the registry (`owner/kabootar`).         |
+| `REGISTRY_USERNAME` / `REGISTRY_PASSWORD`   | Credentials used to push and pull the image.                    |
+| `SSH_HOST` / `SSH_USER` / `SSH_PRIVATE_KEY` | SSH connection details for the target VM.                       |
+| `DEPLOY_DIR`                                | Absolute path on the VM where the compose file and `.env` live. |
 
 If you store the image in GitHub Container Registry you can create a fine-grained
 PAT with `packages:write` scope and use it for the registry credentials.
