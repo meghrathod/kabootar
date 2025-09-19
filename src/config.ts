@@ -9,7 +9,30 @@ export const iceServers: RTCConfiguration = {
   iceCandidatePoolSize: 10,
 };
 
-export const secure = true;
-export const baseURL = "signaling.kabootar.meghrathod.dev";
+const envSecure = import.meta.env.VITE_SIGNALING_SECURE;
+const envHost = import.meta.env.VITE_SIGNALING_HOST;
+const isBrowser = typeof window !== "undefined";
+
+let resolvedSecure = true;
+if (envSecure !== undefined) {
+  resolvedSecure = envSecure === "true";
+} else if (import.meta.env.DEV) {
+  resolvedSecure = false;
+} else if (isBrowser) {
+  resolvedSecure = window.location.protocol === "https:";
+}
+
+export const secure = resolvedSecure;
+
+let resolvedHost = "localhost";
+if (envHost !== undefined) {
+  resolvedHost = envHost;
+} else if (import.meta.env.DEV) {
+  resolvedHost = "localhost:5000";
+} else if (isBrowser) {
+  resolvedHost = window.location.host;
+}
+
+export const baseURL = resolvedHost;
 export const httpScheme = secure ? "https://" : "http://";
 export const wsScheme = secure ? "wss://" : "ws://";
