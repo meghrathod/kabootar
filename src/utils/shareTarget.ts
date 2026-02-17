@@ -22,20 +22,20 @@ function openShareDb(): Promise<IDBDatabase> {
 
 export async function takeSharedPayload(): Promise<SharedPayload | undefined> {
   const db = await openShareDb();
-  const value = await new Promise<SharedPayload | undefined>((resolve, reject) => {
-    const tx = db.transaction("incoming", "readwrite");
-    const store = tx.objectStore("incoming");
-    const getReq = store.get("latest");
-    getReq.onsuccess = () => {
-      const payload = getReq.result as SharedPayload | undefined;
-      // Clear after reading
-      store.delete("latest");
-      resolve(payload);
-    };
-    getReq.onerror = () => reject(getReq.error);
-  });
+  const value = await new Promise<SharedPayload | undefined>(
+    (resolve, reject) => {
+      const tx = db.transaction("incoming", "readwrite");
+      const store = tx.objectStore("incoming");
+      const getReq = store.get("latest");
+      getReq.onsuccess = () => {
+        const payload = getReq.result as SharedPayload | undefined;
+        // Clear after reading
+        store.delete("latest");
+        resolve(payload);
+      };
+      getReq.onerror = () => reject(getReq.error);
+    },
+  );
   db.close();
   return value;
 }
-
-
