@@ -5,3 +5,16 @@ turn_realm = "localhost"
 turn_listen_ip = "0.0.0.0"
 public_ip = "0.0.0.0"
 turn_port = 18937
+
+# Set to true to disable internal TURN server and return external ones
+use_external_turn = false
+
+# Uncomment to statically configure an external ICE Server
+# [[external_ice_servers]]
+# urls = ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"]
+# username = "openrelayproject"
+# credential = "openrelayproject"
+
+# Uncomment to dynamically generate credentials using Cloudflare TURN API
+# cloudflare_turn_key_id = "YOUR_CLOUDFLARE_TURN_KEY_ID"
+# cloudflare_turn_api_token = "YOUR_CLOUDFLARE_TURN_API_TOKEN"

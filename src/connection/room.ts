@@ -33,7 +33,7 @@ class Room<Master extends boolean> {
     private clientKey: string,
     public file: Master extends true ? File : undefined,
     eventDispatcher: RoomEventDispatcher<Master>,
-    turnServer: string,
+    turnServer: any,
     public pin?: string,
   ) {
     this.handler = isMaster
@@ -139,7 +139,7 @@ class Room<Master extends boolean> {
     key: string,
     isMaster: boolean,
   ): Promise<
-    | { ok: true; ws: WebSocket; turn: string }
+    | { ok: true; ws: WebSocket; turn: any }
     | { ok: false; reason: string }
   > {
     const ws = new WebSocket(
@@ -147,7 +147,7 @@ class Room<Master extends boolean> {
     );
 
     const canConnect = await new Promise<
-      { ok: true; turn: string } | { ok: false; reason: string }
+      { ok: true; turn: any } | { ok: false; reason: string }
     >((resolve) => {
       function close(_event: CloseEvent) {
         ws.removeEventListener("close", close);
@@ -217,7 +217,7 @@ class MasterHandler {
     private name: string,
     private emoji: string,
     private clientKey: string,
-    private turnServer: string,
+    private turnServer: any,
     private roomID: string,
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
@@ -332,15 +332,24 @@ class MasterClient {
     private sendSignal: (id: string, signal: string) => void,
     private onClose: () => void,
     private clientKey: string,
-    private turnServer: string,
+    private turnServer: any,
     private roomID: string,
   ) {
     this.closed = false;
 
+    let dynamicIceServers: any[] = [];
+    if (typeof turnServer === "string") {
+      dynamicIceServers = [{ urls: `turn:${turnServer}?transport=tcp`, username: roomID, credential: clientKey }];
+    } else if (Array.isArray(turnServer)) {
+      dynamicIceServers = turnServer;
+    } else if (typeof turnServer === "object" && turnServer !== null) {
+      dynamicIceServers = [turnServer];
+    }
+
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...iceServers.iceServers,
-        { urls: `turn:${turnServer}?transport=tcp`, username: roomID, credential: clientKey },
+        ...dynamicIceServers,
       ],
       iceTransportPolicy: "all",
     });
@@ -547,15 +556,24 @@ class ClientHandler {
     private dispatcher: RoomEventDispatcher<false>,
     private id: string,
     private clientKey: string,
-    private turnServer: string,
+    private turnServer: any,
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.dispatcher.connectionStatusChanged(false);
 
+    let dynamicIceServers: any[] = [];
+    if (typeof turnServer === "string") {
+      dynamicIceServers = [{ urls: `turn:${turnServer}?transport=tcp`, username: id, credential: clientKey }];
+    } else if (Array.isArray(turnServer)) {
+      dynamicIceServers = turnServer;
+    } else if (typeof turnServer === "object" && turnServer !== null) {
+      dynamicIceServers = [turnServer];
+    }
+
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...iceServers.iceServers,
-        { urls: `turn:${turnServer}?transport=tcp`, username: id, credential: clientKey },
+        ...dynamicIceServers,
       ],
       iceTransportPolicy: "all",
     });

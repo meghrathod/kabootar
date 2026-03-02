@@ -29,7 +29,14 @@ func (h *handler) HandleWS(c *websocket.Conn) {
         _ = c.Close()
         return
     }
-    c.WriteJSON([]string{"-1", h.turnURL})
+
+    var turnData interface{} = h.turnURL
+    if h.cfg.UseExternalTurn {
+        if extTurn, err := h.getExternalTurnCredentials(); err == nil {
+            turnData = extTurn
+        }
+    }
+    c.WriteJSON([]interface{}{"-1", turnData})
 
     defer h.leaveRoom(roomID, clientID, isMaster)
 

@@ -1,10 +1,15 @@
 package web
 
 import (
+    "bytes"
+    "encoding/json"
     "errors"
     "net"
+    "net/http"
     "strconv"
     "strings"
+    "sync"
+    "time"
 
     "github.com/gargakshit/kabootar/signalling/config"
     "github.com/gargakshit/kabootar/signalling/util"
@@ -20,6 +25,60 @@ type handler struct {
 	cfg              *config.Config
 	turnServer       *turn.Server
 	turnURL          string
+}
+
+var (
+	cfTurnCache      interface{}
+	cfTurnCacheTime  time.Time
+	cfTurnCacheMutex sync.Mutex
+)
+
+type cloudflareTurnResponse struct {
+	IceServers interface{} `json:"iceServers"`
+}
+
+func (h *handler) getExternalTurnCredentials() (interface{}, error) {
+	if h.cfg.CloudflareTurnKeyID != "" && h.cfg.CloudflareTurnAPIToken != "" {
+		cfTurnCacheMutex.Lock()
+		defer cfTurnCacheMutex.Unlock()
+
+		if cfTurnCache != nil && time.Since(cfTurnCacheTime) < 12*time.Hour {
+			return cfTurnCache, nil
+		}
+
+		url := "https://rtc.live.cloudflare.com/v1/turn/keys/" + h.cfg.CloudflareTurnKeyID + "/credentials/generate"
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(`{"ttl": 86400}`)))
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+h.cfg.CloudflareTurnAPIToken)
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					var cfResp cloudflareTurnResponse
+					if err := json.NewDecoder(resp.Body).Decode(&cfResp); err == nil {
+						cfTurnCache = cfResp.IceServers
+						cfTurnCacheTime = time.Now()
+						return cfTurnCache, nil
+					}
+				}
+			}
+		}
+	}
+
+	if len(h.cfg.ExternalICEServers) > 0 {
+		return h.cfg.ExternalICEServers, nil
+	}
+
+	return []map[string]interface{}{
+		{
+			"urls":       []string{"turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"},
+			"username":   "openrelayproject",
+			"credential": "openrelayproject",
+		},
+	}, nil
 }
 
 func newHandler(cfg *config.Config) *handler {
