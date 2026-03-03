@@ -1,10 +1,10 @@
 package web
 
 import (
-	"time"
+    "time"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/websocket/v2"
+    "github.com/gofiber/fiber/v2"
+    "github.com/gofiber/websocket/v2"
 )
 
 func (*handler) InitializeWS(c *fiber.Ctx) error {
@@ -16,63 +16,63 @@ func (*handler) InitializeWS(c *fiber.Ctx) error {
 }
 
 func (h *handler) HandleWS(c *websocket.Conn) {
-	roomID := c.Params("room_id")
+    roomID := c.Params("room_id")
 
-	key := c.Query("k", "")
-	isMaster := c.Query("m", "f") == "t"
+    key := c.Query("k", "")
+    isMaster := c.Query("m", "f") == "t"
 
-	status, clientID := h.joinRoom(roomID, key, isMaster, c)
-	if status != "ok" {
-		// Emit a terminal error frame before closing so the client can branch UI.
-		// Format: ["-2", "<status>"]
-		_ = c.WriteJSON([]string{"-2", status})
-		_ = c.Close()
-		return
-	}
+    status, clientID := h.joinRoom(roomID, key, isMaster, c)
+    if status != "ok" {
+        // Emit a terminal error frame before closing so the client can branch UI.
+        // Format: ["-2", "<status>"]
+        _ = c.WriteJSON([]string{"-2", status})
+        _ = c.Close()
+        return
+    }
 
-	var turnData interface{} = h.turnURL
-	if h.cfg.UseExternalTurn {
-		if extTurn, err := h.getExternalTurnCredentials(); err == nil {
-			turnData = extTurn
-		}
-	}
-	c.WriteJSON([]interface{}{"-1", turnData})
+    var turnData interface{} = h.turnURL
+    if h.cfg.UseExternalTurn {
+        if extTurn, err := h.getExternalTurnCredentials(); err == nil {
+            turnData = extTurn
+        }
+    }
+    c.WriteJSON([]interface{}{"-1", turnData})
 
-	defer h.leaveRoom(roomID, clientID, isMaster)
+    defer h.leaveRoom(roomID, clientID, isMaster)
 
-	// Keepalive: server-side ping/pong
-	const (
-		writeWait  = 10 * time.Second
-		pongWait   = 45 * time.Second
-		pingPeriod = 15 * time.Second // must be less than pongWait
-	)
+    // Keepalive: server-side ping/pong
+    const (
+        writeWait  = 10 * time.Second
+        pongWait   = 45 * time.Second
+        pingPeriod = 15 * time.Second // must be less than pongWait
+    )
 
-	_ = c.SetReadDeadline(time.Now().Add(pongWait))
-	c.SetPongHandler(func(string) error {
-		return c.SetReadDeadline(time.Now().Add(pongWait))
-	})
+    _ = c.SetReadDeadline(time.Now().Add(pongWait))
+    c.SetPongHandler(func(string) error {
+        return c.SetReadDeadline(time.Now().Add(pongWait))
+    })
 
-	done := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(pingPeriod)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				// Send ping; ignore errors (read loop will exit on failure)
-				_ = c.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
-			case <-done:
-				return
-			}
-		}
-	}()
-	defer close(done)
+    done := make(chan struct{})
+    go func() {
+        ticker := time.NewTicker(pingPeriod)
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ticker.C:
+                // Send ping; ignore errors (read loop will exit on failure)
+                _ = c.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
+            case <-done:
+                return
+            }
+        }
+    }()
+    defer close(done)
 
 	for {
-		_, payload, err := c.ReadMessage()
-		if err != nil {
-			return
-		}
+        _, payload, err := c.ReadMessage()
+        if err != nil {
+            return
+        }
 
 		err = h.handleMsg(roomID, clientID, payload, isMaster)
 		if err != nil {
