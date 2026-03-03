@@ -28,16 +28,20 @@ type handler struct {
 }
 
 var (
-	cfTurnCache      interface{}
+	cfTurnCache      []config.ICEServer
 	cfTurnCacheTime  time.Time
 	cfTurnCacheMutex sync.Mutex
 )
 
 type cloudflareTurnResponse struct {
-	IceServers interface{} `json:"iceServers"`
+	IceServers struct {
+		Urls       []string `json:"urls"`
+		Username   string   `json:"username"`
+		Credential string   `json:"credential"`
+	} `json:"iceServers"`
 }
 
-func (h *handler) getExternalTurnCredentials() (interface{}, error) {
+func (h *handler) getExternalTurnCredentials() ([]config.ICEServer, error) {
 	if h.cfg.CloudflareTurnKeyID != "" && h.cfg.CloudflareTurnAPIToken != "" {
 		cfTurnCacheMutex.Lock()
 		defer cfTurnCacheMutex.Unlock()
@@ -59,7 +63,12 @@ func (h *handler) getExternalTurnCredentials() (interface{}, error) {
 				if resp.StatusCode == http.StatusOK {
 					var cfResp cloudflareTurnResponse
 					if err := json.NewDecoder(resp.Body).Decode(&cfResp); err == nil {
-						cfTurnCache = cfResp.IceServers
+						iceServer := config.ICEServer{
+							URLs:       cfResp.IceServers.Urls,
+							Username:   cfResp.IceServers.Username,
+							Credential: cfResp.IceServers.Credential,
+						}
+						cfTurnCache = []config.ICEServer{iceServer}
 						cfTurnCacheTime = time.Now()
 						return cfTurnCache, nil
 					}
@@ -72,11 +81,11 @@ func (h *handler) getExternalTurnCredentials() (interface{}, error) {
 		return h.cfg.ExternalICEServers, nil
 	}
 
-	return []map[string]interface{}{
+	return []config.ICEServer{
 		{
-			"urls":       []string{"turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"},
-			"username":   "openrelayproject",
-			"credential": "openrelayproject",
+			URLs:       []string{"turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"},
+			Username:   "openrelayproject",
+			Credential: "openrelayproject",
 		},
 	}, nil
 }
