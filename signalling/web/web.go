@@ -21,9 +21,12 @@ func InitWeb(cfg *config.Config) error {
 	})
 
 	h := newHandler(cfg)
-	err := h.InitTurn()
-	if err != nil {
-		return err
+
+	if !cfg.UseExternalTurn {
+		err := h.InitTurn()
+		if err != nil {
+			return err
+		}
 	}
 
 	app.Post("/room", h.CreateRoom)

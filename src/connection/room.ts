@@ -33,7 +33,7 @@ class Room<Master extends boolean> {
     private clientKey: string,
     public file: Master extends true ? File : undefined,
     eventDispatcher: RoomEventDispatcher<Master>,
-    turnServer: string,
+    turnServer: string | RTCIceServer | RTCIceServer[],
     public pin?: string,
   ) {
     this.handler = isMaster
@@ -139,7 +139,7 @@ class Room<Master extends boolean> {
     key: string,
     isMaster: boolean,
   ): Promise<
-    | { ok: true; ws: WebSocket; turn: string }
+    | { ok: true; ws: WebSocket; turn: string | RTCIceServer | RTCIceServer[] }
     | { ok: false; reason: string }
   > {
     const ws = new WebSocket(
@@ -147,7 +147,8 @@ class Room<Master extends boolean> {
     );
 
     const canConnect = await new Promise<
-      { ok: true; turn: string } | { ok: false; reason: string }
+      | { ok: true; turn: string | RTCIceServer | RTCIceServer[] }
+      | { ok: false; reason: string }
     >((resolve) => {
       function close(_event: CloseEvent) {
         ws.removeEventListener("close", close);
@@ -217,7 +218,7 @@ class MasterHandler {
     private name: string,
     private emoji: string,
     private clientKey: string,
-    private turnServer: string,
+    private turnServer: string | RTCIceServer | RTCIceServer[],
     private roomID: string,
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
@@ -332,16 +333,28 @@ class MasterClient {
     private sendSignal: (id: string, signal: string) => void,
     private onClose: () => void,
     private clientKey: string,
-    private turnServer: string,
+    private turnServer: string | RTCIceServer | RTCIceServer[],
     private roomID: string,
   ) {
     this.closed = false;
 
+    let dynamicIceServers: RTCIceServer[] = [];
+    if (typeof turnServer === "string") {
+      dynamicIceServers = [
+        {
+          urls: `turn:${turnServer}?transport=tcp`,
+          username: roomID,
+          credential: clientKey,
+        },
+      ];
+    } else if (Array.isArray(turnServer)) {
+      dynamicIceServers = turnServer;
+    } else if (typeof turnServer === "object" && turnServer !== null) {
+      dynamicIceServers = [turnServer];
+    }
+
     this.pc = new RTCPeerConnection({
-      iceServers: [
-        ...iceServers.iceServers,
-        { urls: `turn:${turnServer}?transport=tcp`, username: roomID, credential: clientKey },
-      ],
+      iceServers: [...iceServers.iceServers, ...dynamicIceServers],
       iceTransportPolicy: "all",
     });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
@@ -349,22 +362,22 @@ class MasterClient {
       "connectionstatechange",
       this.onConnectionStateChange.bind(this),
     );
-  
+
     // Add ICE connection state monitoring
     this.pc.addEventListener(
-      "iceconnectionstatechange", 
-      this.onIceConnectionStateChange.bind(this)
+      "iceconnectionstatechange",
+      this.onIceConnectionStateChange.bind(this),
     );
-  
+
     this.createDataChannel();
     // noinspection JSIgnoredPromiseFromCall
     this.makeOffer();
   }
-  
+
   // Add this new method to MasterClient
   private onIceConnectionStateChange() {
     console.log("ICE connection state:", this.pc.iceConnectionState);
-    
+
     if (this.pc.iceConnectionState === "failed") {
       console.error("ICE connection failed");
       this.close();
@@ -547,37 +560,49 @@ class ClientHandler {
     private dispatcher: RoomEventDispatcher<false>,
     private id: string,
     private clientKey: string,
-    private turnServer: string,
+    private turnServer: string | RTCIceServer | RTCIceServer[],
   ) {
     ws.addEventListener("message", this.handleMessage.bind(this));
     this.dispatcher.connectionStatusChanged(false);
 
+    let dynamicIceServers: RTCIceServer[] = [];
+    if (typeof turnServer === "string") {
+      dynamicIceServers = [
+        {
+          urls: `turn:${turnServer}?transport=tcp`,
+          username: id,
+          credential: clientKey,
+        },
+      ];
+    } else if (Array.isArray(turnServer)) {
+      dynamicIceServers = turnServer;
+    } else if (typeof turnServer === "object" && turnServer !== null) {
+      dynamicIceServers = [turnServer];
+    }
+
     this.pc = new RTCPeerConnection({
-      iceServers: [
-        ...iceServers.iceServers,
-        { urls: `turn:${turnServer}?transport=tcp`, username: id, credential: clientKey },
-      ],
+      iceServers: [...iceServers.iceServers, ...dynamicIceServers],
       iceTransportPolicy: "all",
     });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
     this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
-    
+
     // Add ICE connection state monitoring
     this.pc.addEventListener(
-      "iceconnectionstatechange", 
-      this.onIceConnectionStateChange.bind(this)
+      "iceconnectionstatechange",
+      this.onIceConnectionStateChange.bind(this),
     );
-    
+
     // Set a connection timeout
     this.connectionTimeout = window.setTimeout(() => {
       this.dispatcher.connectionStatusChanged(false);
     }, 30000); // 30 seconds timeout
   }
-  
+
   // Add this new method to ClientHandler
   private onIceConnectionStateChange() {
     console.log("ICE connection state:", this.pc.iceConnectionState);
-    
+
     switch (this.pc.iceConnectionState) {
       case "disconnected":
         console.warn("ICE connection disconnected, may recover automatically");

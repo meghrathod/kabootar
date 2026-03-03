@@ -1,16 +1,21 @@
 package web
 
 import (
-    "errors"
-    "net"
-    "strconv"
-    "strings"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
-    "github.com/gargakshit/kabootar/signalling/config"
-    "github.com/gargakshit/kabootar/signalling/util"
-    "github.com/gofiber/websocket/v2"
-    "github.com/pion/turn/v2"
-    "github.com/puzpuzpuz/xsync"
+	"github.com/gargakshit/kabootar/signalling/config"
+	"github.com/gargakshit/kabootar/signalling/util"
+	"github.com/gofiber/websocket/v2"
+	"github.com/pion/turn/v2"
+	"github.com/puzpuzpuz/xsync"
 )
 
 type handler struct {
@@ -22,22 +27,85 @@ type handler struct {
 	turnURL          string
 }
 
-func newHandler(cfg *config.Config) *handler {
-    turnHost := cfg.TurnRealm
-    // If a port was accidentally provided in TurnRealm, strip it and use cfg.TurnPort
-    if strings.Contains(turnHost, ":") {
-        if h, _, err := net.SplitHostPort(turnHost); err == nil {
-            turnHost = h
-        }
-    }
+var (
+	cfTurnCache      []config.ICEServer
+	cfTurnCacheTime  time.Time
+	cfTurnCacheMutex sync.Mutex
+)
 
-    return &handler{
-        rooms:            xsync.NewMapOf[*Room](),
-        discoverable:     xsync.NewMapOf[map[*Room]struct{}](),
-        discoveryClients: xsync.NewMapOf[map[*websocket.Conn]struct{}](),
-        cfg:              cfg,
-        turnURL:          turnHost + ":" + strconv.Itoa(cfg.TurnPort),
-    }
+type cloudflareTurnResponse struct {
+	IceServers struct {
+		Urls       []string `json:"urls"`
+		Username   string   `json:"username"`
+		Credential string   `json:"credential"`
+	} `json:"iceServers"`
+}
+
+func (h *handler) getExternalTurnCredentials() ([]config.ICEServer, error) {
+	if h.cfg.CloudflareTurnKeyID != "" && h.cfg.CloudflareTurnAPIToken != "" {
+		cfTurnCacheMutex.Lock()
+		defer cfTurnCacheMutex.Unlock()
+
+		if cfTurnCache != nil && time.Since(cfTurnCacheTime) < 12*time.Hour {
+			return cfTurnCache, nil
+		}
+
+		url := "https://rtc.live.cloudflare.com/v1/turn/keys/" + h.cfg.CloudflareTurnKeyID + "/credentials/generate"
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(`{"ttl": 86400}`)))
+		if err == nil {
+			req.Header.Set("Authorization", "Bearer "+h.cfg.CloudflareTurnAPIToken)
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, err := client.Do(req)
+			if err == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					var cfResp cloudflareTurnResponse
+					if err := json.NewDecoder(resp.Body).Decode(&cfResp); err == nil {
+						iceServer := config.ICEServer{
+							URLs:       cfResp.IceServers.Urls,
+							Username:   cfResp.IceServers.Username,
+							Credential: cfResp.IceServers.Credential,
+						}
+						cfTurnCache = []config.ICEServer{iceServer}
+						cfTurnCacheTime = time.Now()
+						return cfTurnCache, nil
+					}
+				}
+			}
+		}
+	}
+
+	if len(h.cfg.ExternalICEServers) > 0 {
+		return h.cfg.ExternalICEServers, nil
+	}
+
+	return []config.ICEServer{
+		{
+			URLs:       []string{"turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp"},
+			Username:   "openrelayproject",
+			Credential: "openrelayproject",
+		},
+	}, nil
+}
+
+func newHandler(cfg *config.Config) *handler {
+	turnHost := cfg.TurnRealm
+	// If a port was accidentally provided in TurnRealm, strip it and use cfg.TurnPort
+	if strings.Contains(turnHost, ":") {
+		if h, _, err := net.SplitHostPort(turnHost); err == nil {
+			turnHost = h
+		}
+	}
+
+	return &handler{
+		rooms:            xsync.NewMapOf[*Room](),
+		discoverable:     xsync.NewMapOf[map[*Room]struct{}](),
+		discoveryClients: xsync.NewMapOf[map[*websocket.Conn]struct{}](),
+		cfg:              cfg,
+		turnURL:          turnHost + ":" + strconv.Itoa(cfg.TurnPort),
+	}
 }
 
 func (h *handler) newRoom() (string, *Room, error) {
@@ -119,65 +187,66 @@ func (h *handler) getRoom(id string) (*Room, bool) {
 
 // joinRoom attempts to join a room and returns a status code and optional clientID.
 // Status codes:
-//   "ok"                - join successful
-//   "missing_key"       - missing key query param
-//   "room_not_found"    - room does not exist
-//   "invalid_key"       - key does not match expected role
-//   "master_exists"     - a master is already connected
-//   "master_absent"     - client attempted to join before master connected
+//
+//	"ok"                - join successful
+//	"missing_key"       - missing key query param
+//	"room_not_found"    - room does not exist
+//	"invalid_key"       - key does not match expected role
+//	"master_exists"     - a master is already connected
+//	"master_absent"     - client attempted to join before master connected
 func (h *handler) joinRoom(
-    roomID,
-    key string,
-    isMaster bool,
-    conn *websocket.Conn,
+	roomID,
+	key string,
+	isMaster bool,
+	conn *websocket.Conn,
 ) (string, string) {
-    if key == "" {
-        return "missing_key", ""
-    }
+	if key == "" {
+		return "missing_key", ""
+	}
 
-    room, exists := h.getRoom(roomID)
-    if !exists {
-        return "room_not_found", ""
-    }
+	room, exists := h.getRoom(roomID)
+	if !exists {
+		return "room_not_found", ""
+	}
 
-    if isMaster {
-        if room.MKey != key {
-            return "invalid_key", ""
-        }
+	if isMaster {
+		if room.MKey != key {
+			return "invalid_key", ""
+		}
 
-        if room.Master != nil {
-            return "master_exists", ""
-        }
+		if room.Master != nil {
+			return "master_exists", ""
+		}
 
-        room.Master = conn
-        return "ok", ""
-    }
+		room.Master = conn
+		return "ok", ""
+	}
 
-    if room.CKey != key {
-        return "invalid_key", ""
-    }
+	if room.CKey != key {
+		return "invalid_key", ""
+	}
 
-    if room.Master == nil {
-        return "master_absent", ""
-    }
+	if room.Master == nil {
+		return "master_absent", ""
+	}
 
-    clientID, err := util.GenerateRandomString(8)
-    if err != nil {
-        return "invalid_key", ""
-    }
+	clientID, err := util.GenerateRandomString(8)
+	if err != nil {
+		return "invalid_key", ""
+	}
 
-    msg, err := MarshalSMsg(&ProtoSMJoinedPayload{ClientID: clientID})
-    if err != nil {
-        return "invalid_key", ""
-    }
+	msg, err := MarshalSMsg(&ProtoSMJoinedPayload{ClientID: clientID})
+	if err != nil {
+		return "invalid_key", ""
+	}
 
-    err = room.Master.WriteMessage(1, msg)
-    if err != nil {
-        return "invalid_key", ""
-    }
+	err = room.Master.WriteMessage(1, msg)
+	if err != nil {
+		return "invalid_key", ""
+	}
 
-    room.Clients.Store(clientID, conn)
-    return "ok", clientID
+	room.Clients.Store(clientID, conn)
+	return "ok", clientID
 }
 
 func (h *handler) leaveRoom(
