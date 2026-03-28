@@ -340,7 +340,11 @@ class MasterClient {
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...iceServers.iceServers,
-        { urls: `turn:${turnServer}?transport=tcp`, username: roomID, credential: clientKey },
+        {
+          urls: `turn:${turnServer}?transport=tcp`,
+          username: roomID,
+          credential: clientKey,
+        },
       ],
       iceTransportPolicy: "all",
     });
@@ -349,22 +353,22 @@ class MasterClient {
       "connectionstatechange",
       this.onConnectionStateChange.bind(this),
     );
-  
+
     // Add ICE connection state monitoring
     this.pc.addEventListener(
-      "iceconnectionstatechange", 
-      this.onIceConnectionStateChange.bind(this)
+      "iceconnectionstatechange",
+      this.onIceConnectionStateChange.bind(this),
     );
-  
+
     this.createDataChannel();
     // noinspection JSIgnoredPromiseFromCall
     this.makeOffer();
   }
-  
+
   // Add this new method to MasterClient
   private onIceConnectionStateChange() {
     console.log("ICE connection state:", this.pc.iceConnectionState);
-    
+
     if (this.pc.iceConnectionState === "failed") {
       console.error("ICE connection failed");
       this.close();
@@ -555,29 +559,33 @@ class ClientHandler {
     this.pc = new RTCPeerConnection({
       iceServers: [
         ...iceServers.iceServers,
-        { urls: `turn:${turnServer}?transport=tcp`, username: id, credential: clientKey },
+        {
+          urls: `turn:${turnServer}?transport=tcp`,
+          username: id,
+          credential: clientKey,
+        },
       ],
       iceTransportPolicy: "all",
     });
     this.pc.addEventListener("icecandidate", this.onIceCandidate.bind(this));
     this.pc.addEventListener("datachannel", this.onDataChannel.bind(this));
-    
+
     // Add ICE connection state monitoring
     this.pc.addEventListener(
-      "iceconnectionstatechange", 
-      this.onIceConnectionStateChange.bind(this)
+      "iceconnectionstatechange",
+      this.onIceConnectionStateChange.bind(this),
     );
-    
+
     // Set a connection timeout
     this.connectionTimeout = window.setTimeout(() => {
       this.dispatcher.connectionStatusChanged(false);
     }, 30000); // 30 seconds timeout
   }
-  
+
   // Add this new method to ClientHandler
   private onIceConnectionStateChange() {
     console.log("ICE connection state:", this.pc.iceConnectionState);
-    
+
     switch (this.pc.iceConnectionState) {
       case "disconnected":
         console.warn("ICE connection disconnected, may recover automatically");
