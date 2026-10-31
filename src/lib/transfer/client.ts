@@ -197,8 +197,12 @@ export class ItemClient {
       case "end": {
         const d = this.active;
         if (!d || d.meta.id !== msg.id) return;
-        this.finish(d, typeof msg.sha256 === "string" ? msg.sha256 : "").catch((err) =>
-          this.fail(d, err instanceof Error ? err.message : "Could not finish the file"),
+        this.finish(d, typeof msg.sha256 === "string" ? msg.sha256 : "").catch(
+          (err) =>
+            this.fail(
+              d,
+              err instanceof Error ? err.message : "Could not finish the file",
+            ),
         );
         break;
       }
