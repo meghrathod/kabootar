@@ -47,16 +47,19 @@ and run `yarn deploy` again.
 
 ## Continuous deployment
 
-`.github/workflows/ci.yml` runs typechecks, unit tests, worker tests and the end-to-end suite on every push and pull request, and deploys every push to `develop` once they pass.
+Deploys are done by Cloudflare's GitHub integration (Workers Builds), so no API token is stored in GitHub. `.github/workflows/ci.yml` only runs typechecks, unit tests, worker tests and the end-to-end suite on every push and pull request.
 
-Add two repository secrets (**Settings → Secrets and variables → Actions**):
+Connect the repository once in the dashboard: **Workers & Pages → kabootar → Settings → Builds → Connect** (pick this repository), then set:
 
-| Secret                  | Where to get it                                                                           |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`  | Dashboard → My Profile → API Tokens → Create Token → **Edit Cloudflare Workers** template |
-| `CLOUDFLARE_ACCOUNT_ID` | Dashboard → Workers & Pages → Account ID (right sidebar)                                  |
+| Setting           | Value                                                      |
+| ----------------- | ---------------------------------------------------------- |
+| Production branch | `develop`                                                  |
+| Build command     | `yarn build`                                               |
+| Deploy command    | `npx wrangler deploy --var VERSION:$WORKERS_CI_COMMIT_SHA` |
 
-Worker secrets (`SERVER_SECRET`, TURN keys) are stored in Cloudflare, not GitHub; set them once as above. Until the GitHub secrets exist the deploy job is skipped with a notice.
+Every push to `develop` is then built and deployed by Cloudflare and reported back as a check on the commit. It runs alongside GitHub Actions CI, not after it, so a push that fails CI is still deployed.
+
+Worker secrets (`SERVER_SECRET`, TURN keys) are stored in Cloudflare, not GitHub; set them once as above.
 
 ## Configuration
 

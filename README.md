@@ -47,7 +47,7 @@ yarn test:e2e      # two browsers doing a real WebRTC transfer (needs `yarn buil
 
 ## Deployment
 
-`yarn deploy` after a one-time setup; CI deploys every push to `develop`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+`yarn deploy` after a one-time setup; Cloudflare's GitHub integration deploys every push to `develop`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## License
 
