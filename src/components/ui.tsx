@@ -27,7 +27,7 @@ export function Postmark({
       width={size}
       height={size}
       viewBox="0 0 100 100"
-      className="shrink-0 -rotate-12"
+      className="kb-tilt shrink-0 -rotate-12"
       aria-hidden
     >
       <defs>
@@ -79,7 +79,7 @@ export function Postmark({
 /** The share code as a perforated postage stamp. */
 export function Stamp({ code, emoji }: { code: string; emoji?: string }) {
   return (
-    <div className="stamp inline-block rotate-[-1.5deg]">
+    <div className="stamp kb-tilt inline-block rotate-[-1.5deg]">
       <div className="border border-dashed border-ink/25 px-5 py-3">
         <div className="flex items-center justify-between gap-6 font-mono text-[10px] font-medium tracking-[0.18em] text-ink/55">
           <span>AIRMAIL · CODE</span>
@@ -121,11 +121,14 @@ export function Dialog({
   onClose,
   title,
   children,
+  zoom = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Zoom up from small (used for the QR code). */
+  zoom?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -139,7 +142,7 @@ export function Dialog({
       ref={ref}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="panel m-auto w-[min(92vw,26rem)] bg-ink-2/90 p-0 text-white backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+      className={`kb-dialog panel m-auto w-[min(92vw,26rem)] bg-ink-2/90 p-0 text-white ${zoom ? "kb-zoom" : ""}`}
     >
       <div className="p-6">
         <div className="mb-4 flex items-center justify-between">
@@ -210,7 +213,11 @@ export function CodeInput({
                   : "border-white/10"
               }`}
             >
-              {value[i] ?? ""}
+              {value[i] && (
+                <span key={`${i}${value[i]}`} className="kb-digit">
+                  {value[i]}
+                </span>
+              )}
             </div>
           );
         })}
@@ -339,8 +346,8 @@ export function Tip({
           ref={bubble}
           role="tooltip"
           id={id}
-          style={{ transform: `translateX(${shift}px)` }}
-          className={`absolute top-full z-30 mt-2 w-64 max-w-[calc(100vw-24px)] rounded-xl border border-white/10 bg-ink-3 p-3 font-sans text-xs leading-relaxed tracking-normal text-white/80 normal-case shadow-2xl shadow-black/50 ${
+          style={{ marginLeft: shift }}
+          className={`kb-pop absolute top-full z-30 mt-2 w-64 max-w-[calc(100vw-24px)] rounded-xl border border-white/10 bg-ink-3 p-3 font-sans text-xs leading-relaxed tracking-normal text-white/80 normal-case shadow-2xl shadow-black/50 ${
             align === "right" ? "right-0" : "left-0"
           }`}
         >

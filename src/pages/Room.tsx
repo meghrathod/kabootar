@@ -306,10 +306,12 @@ function SenderView({ session }: { session: SenderSession }) {
       <Logo size="5rem" link />
       <div className="h-6" />
       <div className="panel animate-rise p-5 md:p-7">
-        <header className="flex items-center gap-4">
+        {/* Narrow screens: postmark and Stop on top, the full name below.
+            The name never truncates: it's how receivers spot the share. */}
+        <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
           <Postmark room={s.room} />
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-2xl font-semibold">
+          <div className="order-last w-full sm:order-none sm:w-auto sm:min-w-0 sm:flex-1">
+            <h1 className="font-display text-2xl leading-tight font-semibold text-balance">
               {s.room.name}
             </h1>
             <p className="flex items-center gap-2 text-xs text-white/55">
@@ -320,7 +322,7 @@ function SenderView({ session }: { session: SenderSession }) {
             </p>
           </div>
           <button
-            className="btn-danger py-2"
+            className="btn-danger ml-auto shrink-0 px-3 py-2 sm:ml-0 sm:self-start"
             onClick={() => setConfirmStop(true)}
           >
             <Icon name="stop" className="h-4 w-4" /> Stop
@@ -338,7 +340,7 @@ function SenderView({ session }: { session: SenderSession }) {
             </p>
           </div>
           <button
-            className="mx-auto w-32 md:w-28"
+            className="kb-lift mx-auto w-32 md:w-28"
             onClick={() => setQrOpen(true)}
             aria-label="Show QR code"
           >
@@ -400,6 +402,7 @@ function SenderView({ session }: { session: SenderSession }) {
         open={qrOpen}
         onClose={() => setQrOpen(false)}
         title="Scan to receive"
+        zoom
       >
         <div className="mx-auto w-64">
           <QRCode value={s.link} />
@@ -452,7 +455,10 @@ function PeerRow({
           ? "idle"
           : "ok";
   return (
-    <li className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+    <li
+      className="kb-stagger rounded-2xl border border-white/5 bg-white/[0.03] p-3"
+      style={{ "--i": index } as React.CSSProperties}
+    >
       <div className="flex items-center gap-2 text-sm">
         <StatusDot tone={tone} />
         <span className="font-medium">Receiver {index + 1}</span>
@@ -625,13 +631,13 @@ function ReceiverView({
             <Icon name="arrowLeft" />
           </button>
           {s.room ? (
-            <Postmark room={s.room} />
+            <Postmark room={s.room} size={52} />
           ) : (
-            <div className="h-16 w-16 animate-pulse rounded-full bg-white/10" />
+            <div className="h-13 w-13 shrink-0 animate-pulse rounded-full bg-white/10" />
           )}
           <div className="min-w-0 flex-1">
             <p className="label">Receiving from</p>
-            <h1 className="truncate font-display text-2xl font-semibold">
+            <h1 className="font-display text-xl leading-tight font-semibold text-balance sm:text-2xl">
               {s.room?.name ?? "…"}
             </h1>
           </div>
@@ -689,8 +695,9 @@ function ReceiverView({
 
         {files.length > 0 && (
           <ul className="mt-5 divide-y divide-white/5">
-            {files.map((f) => (
+            {files.map((f, i) => (
               <FileRow
+                index={i}
                 key={f.id}
                 meta={f}
                 state={states[f.id]}
@@ -801,12 +808,14 @@ function TextItem({ text }: { text: string }) {
 }
 
 function FileRow({
+  index,
   meta,
   state,
   disabled,
   onDownload,
   onCancel,
 }: {
+  index: number;
   meta: FileMeta;
   state: ItemState | undefined;
   disabled: boolean;
@@ -820,7 +829,7 @@ function FileRow({
       ? 100
       : 0;
   return (
-    <li className="py-3">
+    <li className="kb-stagger py-3" style={{ "--i": index } as React.CSSProperties}>
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-white/70">
           <Icon

@@ -171,6 +171,125 @@
   }
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Motion: small, quick and consistent. Everything here is switched off by the
+ * prefers-reduced-motion rule below.
+ */
+:root {
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Dialogs fade and lift in, backdrop blurs in; both animate out on close. */
+.kb-dialog {
+  opacity: 0;
+  transform: translateY(10px) scale(0.96);
+  transition:
+    opacity 0.2s var(--ease-out),
+    transform 0.28s var(--ease-out),
+    overlay 0.28s allow-discrete,
+    display 0.28s allow-discrete;
+}
+.kb-dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+@starting-style {
+  .kb-dialog[open] {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+/* The QR dialog zooms up from small, like the thumbnail being maximised. */
+.kb-dialog.kb-zoom:not([open]) {
+  transform: scale(0.55);
+}
+@starting-style {
+  .kb-dialog.kb-zoom[open] {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+}
+.kb-dialog::backdrop {
+  background: rgb(0 0 0 / 0);
+  backdrop-filter: blur(0);
+  transition:
+    background 0.28s var(--ease-out),
+    backdrop-filter 0.28s var(--ease-out),
+    overlay 0.28s allow-discrete,
+    display 0.28s allow-discrete;
+}
+.kb-dialog[open]::backdrop {
+  background: rgb(0 0 0 / 0.6);
+  backdrop-filter: blur(4px);
+}
+@starting-style {
+  .kb-dialog[open]::backdrop {
+    background: rgb(0 0 0 / 0);
+    backdrop-filter: blur(0);
+  }
+}
+
+/* Small pop for tooltips and other elements that appear in place. */
+.kb-pop {
+  transform-origin: top left;
+  transition:
+    opacity 0.16s var(--ease-out),
+    transform 0.2s var(--ease-out);
+}
+@starting-style {
+  .kb-pop {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+
+/* Staggered entrance for list rows: set --i on each row. */
+.kb-stagger {
+  animation: rise 0.4s var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 8) * 45ms);
+}
+
+/* Gentle lift on hover for interactive surfaces (pointer devices only). */
+@media (hover: hover) {
+  .btn,
+  .btn-ghost,
+  .btn-danger,
+  .chip,
+  .kb-lift {
+    transition-property: color, background-color, border-color, transform, box-shadow;
+    transition-duration: 0.18s;
+    transition-timing-function: var(--ease-out);
+  }
+  .btn-ghost:hover:not(:disabled),
+  .btn-danger:hover:not(:disabled),
+  button.chip:hover,
+  .kb-lift:hover {
+    transform: translateY(-1px);
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 0 #1592a8;
+  }
+  .kb-tilt {
+    transition: transform 0.35s var(--ease-out);
+  }
+  .kb-tilt:hover {
+    transform: rotate(-3deg) scale(1.03);
+  }
+}
+
+/* A digit typed into the code input pops in. */
+.kb-digit {
+  animation: digit 0.22s var(--ease-out);
+}
+@keyframes digit {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

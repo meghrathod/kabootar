@@ -55,7 +55,10 @@ export function EntryLayout() {
         </nav>
       </header>
       <div className={`transition-all ${ease} ${compact ? "mt-6" : "mt-8"}`}>
-        <Outlet />
+        {/* Re-keyed per mode so switching Send/Receive cross-fades. */}
+        <div key={pathname} className="animate-rise">
+          <Outlet />
+        </div>
       </div>
     </Centered>
   );

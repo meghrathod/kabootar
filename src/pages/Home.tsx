@@ -160,7 +160,11 @@ export default function Home() {
         ) : (
           <ul className="max-h-[42vh] divide-y divide-white/5 overflow-y-auto px-1">
             {d.files.map((f, i) => (
-              <li key={`f${i}`} className="flex items-center gap-3 py-2.5">
+              <li
+                key={`f${i}`}
+                className="kb-stagger flex items-center gap-3 py-2.5"
+                style={{ "--i": i } as React.CSSProperties}
+              >
                 <Icon name="file" className="h-5 w-5 shrink-0 text-white/50" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{f.path ?? f.file.name}</p>
@@ -178,7 +182,11 @@ export default function Home() {
               </li>
             ))}
             {d.texts.map((t, i) => (
-              <li key={`t${i}`} className="flex items-center gap-3 py-2.5">
+              <li
+                key={`t${i}`}
+                className="kb-stagger flex items-center gap-3 py-2.5"
+                style={{ "--i": d.files.length + i } as React.CSSProperties}
+              >
                 <Icon
                   name={/^https?:\/\//.test(t) ? "link" : "text"}
                   className="h-5 w-5 shrink-0 text-white/50"

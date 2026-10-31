@@ -93,8 +93,8 @@ export default function Receive() {
           </div>
         ) : (
           <ul className="mt-3 space-y-2">
-            {rooms.map((r) => (
-              <li key={r.id}>
+            {rooms.map((r, i) => (
+              <li key={r.id} className="kb-stagger" style={{ "--i": i } as React.CSSProperties}>
                 <button
                   onClick={() => setPicked(r)}
                   className="flex w-full items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] p-3 text-left transition hover:bg-white/[0.07]"
