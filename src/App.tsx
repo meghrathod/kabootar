@@ -1,33 +1,34 @@
-import { Route, Router, Routes } from "@solidjs/router";
-import { MetaProvider } from "@solidjs/meta";
-import type { Component } from "solid-js";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
-import HomePage from "./pages/Home";
-import DiscoverPage from "./pages/Discover";
-import SharePage from "./pages/Share";
-import RoomNotFound from "./pages/RoomNotFound";
-import RoomClosed from "./pages/RoomClosed";
-import RoomUnavailable from "./pages/RoomUnavailable";
-import SafariWarning from "./components/SafariWarning";
+import { EntryLayout } from "./components/EntryLayout";
+import { Toasts } from "./components/Toasts";
+import { UpdatePrompt } from "./components/UpdatePrompt";
+import Home from "./pages/Home";
+import NotFound from "./pages/NotFound";
+import Receive from "./pages/Receive";
+import Room from "./pages/Room";
 
-const App: Component = () => {
+export default function App() {
   return (
-    <MetaProvider>
-      <main class="h-full">
-        <SafariWarning />
-        <Router>
+    <BrowserRouter>
+      <div className="relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        <main>
           <Routes>
-            <Route path="/" component={HomePage} />
-            <Route path="/discover" component={DiscoverPage} />
-            <Route path="/:id" component={SharePage} />
-            <Route path="/room-not-found" component={RoomNotFound} />
-            <Route path="/room-closed" component={RoomClosed} />
-            <Route path="/room-unavailable" component={RoomUnavailable} />
+            <Route element={<EntryLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/receive" element={<Receive />} />
+            </Route>
+            <Route
+              path="/discover"
+              element={<Navigate to="/receive" replace />}
+            />
+            <Route path="/:id" element={<Room />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
-        </Router>
-      </main>
-    </MetaProvider>
+        </main>
+      </div>
+      <Toasts />
+      <UpdatePrompt />
+    </BrowserRouter>
   );
-};
-
-export default App;
+}
