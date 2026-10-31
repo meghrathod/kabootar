@@ -9,7 +9,7 @@ Peer-to-peer file sharing in the browser. Files go straight from one device to a
 - **Large files**: streamed to disk (File System Access API on desktop Chromium, a service-worker download on Android/Firefox, private storage on Safari/iOS).
 - **Resumable**: transfers survive network hiccups (ICE restart) and reconnects (resume from the last byte).
 - **Verified**: every file is checked with SHA-256 after transfer.
-- **Installable PWA**: works offline, and on Android it appears in the system share sheet.
+- **Installable PWA**: opens instantly from the home screen, and on Android it appears in the system share sheet. Sharing needs an internet connection: the server introduces the two devices, then the file goes directly between them.
 
 ## How it works
 

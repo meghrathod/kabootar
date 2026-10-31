@@ -20,7 +20,7 @@
 | `src/lib/sender.ts`, `receiver.ts` | WebRTC sessions: peer connections, ICE restart, reconnects                       |
 | `src/lib/signal.ts`                | Signalling websocket with reconnect and heartbeat                                |
 | `src/lib/sinks/`                   | Where received bytes go: save picker, service-worker stream, OPFS, memory        |
-| `src/sw.ts`                        | Service worker: offline shell, share target, streamed downloads                  |
+| `src/sw.ts`                        | Service worker: cached app shell, share target, streamed downloads                  |
 | `worker/src/`                      | Cloudflare Worker and durable objects                                            |
 | `e2e/`                             | Playwright tests                                                                 |
 

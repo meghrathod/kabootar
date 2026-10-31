@@ -42,6 +42,11 @@
   #root {
     height: 100%;
   }
+  /* No rubber-band bounce past the content (Safari applies it to the root
+     scroller): the installed app should feel fixed in place. */
+  html {
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-ink text-white antialiased font-sans;
     background:
