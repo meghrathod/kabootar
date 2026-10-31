@@ -1,122 +1,137 @@
-/// <reference lib="WebWorker" />
+/// <reference lib="webworker" />
+import { clientsClaim } from "workbox-core";
+import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import { NavigationRoute, registerRoute } from "workbox-routing";
 
-import { DownloadableStreamMetadata } from "./downloader/stream";
+import { putShared } from "./lib/shareStore";
 
-declare const self: ServiceWorkerGlobalScope;
+declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: string; revision: string | null }> };
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
-  console.info("Service worker installed");
-});
-
-self.addEventListener("activate", () => {
-  self.clients.claim();
-  console.info("Service worker activated");
-});
-
-const downloadable = new Map<string, DownloadableStreamMetadata>();
-const streamURLBase = "stream";
+// App shell: works offline and loads instantly on repeat visits.
+precacheAndRoute(self.__WB_MANIFEST);
+cleanupOutdatedCaches();
+registerRoute(
+  new NavigationRoute(createHandlerBoundToURL("/index.html"), {
+    denylist: [/^\/api\//, /^\/ws\//, /^\/healthz/, /^\/share-target/, /^\/dl\//],
+  }),
+);
 
 self.addEventListener("message", (event) => {
-  if (event.data.type === "stream") {
-    const metadata = event.data.data as DownloadableStreamMetadata;
-    const url = `${self.registration.scope}${streamURLBase}/${metadata.seed}`;
-
-    downloadable.set(url, metadata);
-    // event.ports[0].postMessage(url);
-    metadata.port.postMessage(url);
-  }
+  if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
+  if (event.data?.type === "download") registerDownload(event);
 });
+clientsClaim();
+
+// ---------------------------------------------------------------------------
+// Web Share Target: files/text shared from other apps arrive as a POST.
 
 self.addEventListener("fetch", (event) => {
-  const url = event.request.url;
-
-  // Handle Web Share Target POST
-  const requestUrl = new URL(url);
-  if (
-    event.request.method === "POST" &&
-    requestUrl.pathname === "/share-target"
-  ) {
-    event.respondWith(handleShareTarget(event));
+  const url = new URL(event.request.url);
+  if (event.request.method === "POST" && url.pathname === "/share-target") {
+    event.respondWith(handleShare(event.request));
     return;
   }
-  if (url.endsWith("/stream/ping")) {
-    return event.respondWith(new Response("pong"));
+  if (url.pathname.startsWith("/dl/")) {
+    const res = serveDownload(url.pathname);
+    if (res) event.respondWith(res);
   }
-
-  if (!downloadable.has(url)) {
-    return;
-  }
-
-  const stream = downloadable.get(url);
-  downloadable.delete(url);
-
-  const headers = new Headers({
-    "Content-Type": "application/octet-stream",
-    "Content-Length": stream.size.toString(),
-    "Content-Disposition": `attachment; filename="${encodeURIComponent(
-      stream.name,
-    )}"`,
-  });
-
-  event.respondWith(new Response(stream.stream, { headers }));
 });
 
-async function handleShareTarget(event: FetchEvent): Promise<Response> {
+async function handleShare(request: Request): Promise<Response> {
   try {
-    const formData = await event.request.formData();
-    const files = formData.getAll("files") as File[];
-    const title = formData.get("title") as string | null;
-    const text = formData.get("text") as string | null;
-    const sharedUrl = formData.get("url") as string | null;
-
-    await putSharedPayload({
-      timestamp: Date.now(),
+    const form = await request.formData();
+    const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size >= 0 && f.name !== "");
+    const id = crypto.randomUUID();
+    await putShared(id, {
       files,
-      title: title ?? undefined,
-      text: text ?? undefined,
-      url: sharedUrl ?? undefined,
+      title: (form.get("title") as string | null) ?? undefined,
+      text: (form.get("text") as string | null) ?? undefined,
+      url: (form.get("url") as string | null) ?? undefined,
+      timestamp: Date.now(),
     });
-
-    const redirectUrl = new URL("/", self.registration.scope);
-    redirectUrl.searchParams.set("share-target", "1");
-    return Response.redirect(redirectUrl.toString(), 303);
+    return Response.redirect(`/?shared=${id}`, 303);
   } catch (err) {
-    console.error("Failed to handle share target:", err);
-    return new Response("Failed to process share", { status: 500 });
+    console.error("share target failed", err);
+    return Response.redirect("/?shared=error", 303);
   }
 }
 
-interface SharedPayload {
-  timestamp: number;
-  files: File[];
-  title?: string;
-  text?: string;
-  url?: string;
+// ---------------------------------------------------------------------------
+// Streamed downloads: the page pushes received chunks through a MessagePort
+// and the browser saves the response like any other download, so large files
+// never sit in memory.
+
+interface PendingDownload {
+  name: string;
+  size: number;
+  mime: string;
+  port: MessagePort;
+  created: number;
 }
 
-function openShareDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open("kabootar-share-target", 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains("incoming")) {
-        db.createObjectStore("incoming");
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+const downloads = new Map<string, PendingDownload>();
+
+function registerDownload(event: ExtendableMessageEvent) {
+  const port = event.ports[0];
+  if (!port) return;
+  const { name, size, mime } = event.data as { name: string; size: number; mime: string };
+  const id = crypto.randomUUID();
+  downloads.set(`/dl/${id}`, { name: String(name), size: Number(size), mime: String(mime), port, created: Date.now() });
+  port.postMessage({ url: `/dl/${id}` });
+  for (const [k, d] of downloads) if (Date.now() - d.created > 60_000) downloads.delete(k);
 }
 
-async function putSharedPayload(payload: SharedPayload): Promise<void> {
-  const db = await openShareDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("incoming", "readwrite");
-    const store = tx.objectStore("incoming");
-    store.put(payload, "latest");
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+function serveDownload(path: string): Response | undefined {
+  const d = downloads.get(path);
+  if (!d) return undefined;
+  downloads.delete(path);
+
+  const { port } = d;
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      start(controller) {
+        // Tell the page the browser really started the download; if it never
+        // does (blocked or prompted), the page falls back to another sink.
+        port.postMessage({ started: true });
+        port.onmessage = (e) => {
+          const msg = e.data;
+          if (msg.chunk) {
+            controller.enqueue(new Uint8Array(msg.chunk));
+            // Grant another write once the queue has room.
+            if ((controller.desiredSize ?? 0) > 0) port.postMessage({ credit: 1 });
+            else pendingCredits++;
+          } else if (msg.done) {
+            controller.close();
+            port.close();
+          } else if (msg.abort) {
+            controller.error(new Error("aborted"));
+            port.close();
+          }
+        };
+      },
+      pull() {
+        if (pendingCredits > 0) {
+          port.postMessage({ credit: pendingCredits });
+          pendingCredits = 0;
+        }
+      },
+      cancel() {
+        port.postMessage({ cancelled: true });
+        port.close();
+      },
+    },
+    new CountQueuingStrategy({ highWaterMark: 32 }),
+  );
+  let pendingCredits = 0;
+
+  const encoded = encodeURIComponent(d.name).replace(/['()]/g, escape);
+  const ascii = d.name.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  return new Response(stream, {
+    headers: {
+      "Content-Type": d.mime || "application/octet-stream",
+      "Content-Length": String(d.size),
+      "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`,
+      "X-Content-Type-Options": "nosniff",
+    },
   });
-  db.close();
 }
