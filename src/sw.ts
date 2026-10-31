@@ -1,18 +1,30 @@
 /// <reference lib="webworker" />
 import { clientsClaim } from "workbox-core";
-import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
+import {
+  cleanupOutdatedCaches,
+  createHandlerBoundToURL,
+  precacheAndRoute,
+} from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 
 import { putShared } from "./lib/shareStore";
 
-declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<{ url: string; revision: string | null }> };
+declare const self: ServiceWorkerGlobalScope & {
+  __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
+};
 
 // App shell: works offline and loads instantly on repeat visits.
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL("/index.html"), {
-    denylist: [/^\/api\//, /^\/ws\//, /^\/healthz/, /^\/share-target/, /^\/dl\//],
+    denylist: [
+      /^\/api\//,
+      /^\/ws\//,
+      /^\/healthz/,
+      /^\/share-target/,
+      /^\/dl\//,
+    ],
   }),
 );
 
@@ -40,7 +52,11 @@ self.addEventListener("fetch", (event) => {
 async function handleShare(request: Request): Promise<Response> {
   try {
     const form = await request.formData();
-    const files = form.getAll("files").filter((f): f is File => f instanceof File && f.size >= 0 && f.name !== "");
+    const files = form
+      .getAll("files")
+      .filter(
+        (f): f is File => f instanceof File && f.size >= 0 && f.name !== "",
+      );
     const id = crypto.randomUUID();
     await putShared(id, {
       files,
@@ -74,11 +90,22 @@ const downloads = new Map<string, PendingDownload>();
 function registerDownload(event: ExtendableMessageEvent) {
   const port = event.ports[0];
   if (!port) return;
-  const { name, size, mime } = event.data as { name: string; size: number; mime: string };
+  const { name, size, mime } = event.data as {
+    name: string;
+    size: number;
+    mime: string;
+  };
   const id = crypto.randomUUID();
-  downloads.set(`/dl/${id}`, { name: String(name), size: Number(size), mime: String(mime), port, created: Date.now() });
+  downloads.set(`/dl/${id}`, {
+    name: String(name),
+    size: Number(size),
+    mime: String(mime),
+    port,
+    created: Date.now(),
+  });
   port.postMessage({ url: `/dl/${id}` });
-  for (const [k, d] of downloads) if (Date.now() - d.created > 60_000) downloads.delete(k);
+  for (const [k, d] of downloads)
+    if (Date.now() - d.created > 60_000) downloads.delete(k);
 }
 
 function serveDownload(path: string): Response | undefined {
@@ -98,7 +125,8 @@ function serveDownload(path: string): Response | undefined {
           if (msg.chunk) {
             controller.enqueue(new Uint8Array(msg.chunk));
             // Grant another write once the queue has room.
-            if ((controller.desiredSize ?? 0) > 0) port.postMessage({ credit: 1 });
+            if ((controller.desiredSize ?? 0) > 0)
+              port.postMessage({ credit: 1 });
             else pendingCredits++;
           } else if (msg.done) {
             controller.close();

@@ -12,7 +12,14 @@ import {
   validItems,
 } from "./protocol";
 
-export type ItemStatus = "idle" | "queued" | "receiving" | "verifying" | "done" | "error" | "cancelled";
+export type ItemStatus =
+  | "idle"
+  | "queued"
+  | "receiving"
+  | "verifying"
+  | "done"
+  | "error"
+  | "cancelled";
 
 export interface ItemState {
   status: ItemStatus;
@@ -31,7 +38,11 @@ export interface ClientCallbacks {
    * the hash state at exactly that point, so a download can be resumed after
    * a page reload.
    */
-  onCheckpoint?(id: number, written: number, hashState: () => Uint8Array | undefined): void;
+  onCheckpoint?(
+    id: number,
+    written: number,
+    hashState: () => Uint8Array | undefined,
+  ): void;
 }
 
 export interface ResumeFrom {
@@ -64,7 +75,11 @@ export class ItemClient {
   readonly states = new Map<number, ItemState>();
 
   private ch: Channel | undefined;
-  private queue: { meta: FileMeta; open: () => Promise<Sink>; from?: ResumeFrom }[] = [];
+  private queue: {
+    meta: FileMeta;
+    open: () => Promise<Sink>;
+    from?: ResumeFrom;
+  }[] = [];
   private active: Download | undefined;
 
   constructor(private cb: ClientCallbacks = {}) {}
@@ -98,10 +113,17 @@ export class ItemClient {
    * file's turn comes (so queued browser downloads don't all start at once).
    */
   download(id: number, sink: Sink | (() => Promise<Sink>), from?: ResumeFrom) {
-    const meta = this.items.find((i): i is FileMeta => i.id === id && i.kind === "file");
+    const meta = this.items.find(
+      (i): i is FileMeta => i.id === id && i.kind === "file",
+    );
     if (!meta) throw new Error("Unknown item");
-    if (this.active?.meta.id === id || this.queue.some((q) => q.meta.id === id)) return;
-    this.queue.push({ meta, open: typeof sink === "function" ? sink : () => Promise.resolve(sink), from });
+    if (this.active?.meta.id === id || this.queue.some((q) => q.meta.id === id))
+      return;
+    this.queue.push({
+      meta,
+      open: typeof sink === "function" ? sink : () => Promise.resolve(sink),
+      from,
+    });
     this.setState(id, { status: "queued", received: from?.offset ?? 0 });
     void this.next();
   }
@@ -161,7 +183,9 @@ export class ItemClient {
         if (!d || d.meta.id !== msg.id) return;
         if (msg.offset === d.received) {
           d.accepting = true;
-          console.info(`[kabootar] receiving item ${msg.id} from byte ${msg.offset}`);
+          console.info(
+            `[kabootar] receiving item ${msg.id} from byte ${msg.offset}`,
+          );
         } else {
           d.accepting = false;
           this.send({ t: "get", id: d.meta.id, offset: d.received });
@@ -176,7 +200,8 @@ export class ItemClient {
       }
       case "error": {
         const d = this.active;
-        if (d && d.meta.id === msg.id) void this.fail(d, String(msg.message || "Sender error"));
+        if (d && d.meta.id === msg.id)
+          void this.fail(d, String(msg.message || "Sender error"));
         break;
       }
     }
@@ -186,13 +211,19 @@ export class ItemClient {
     const items = validItems(raw);
     if (this.items.length === 0) {
       this.items = items;
-      for (const it of items) if (!this.states.has(it.id)) this.states.set(it.id, { status: "idle", received: 0 });
+      for (const it of items)
+        if (!this.states.has(it.id))
+          this.states.set(it.id, { status: "idle", received: 0 });
       this.cb.onItems?.(items);
     }
     // Reconnected mid-transfer: resume from where we stopped.
     if (this.active?.ready && !this.active.failed) {
       this.active.accepting = false;
-      this.send({ t: "get", id: this.active.meta.id, offset: this.active.received });
+      this.send({
+        t: "get",
+        id: this.active.meta.id,
+        offset: this.active.received,
+      });
     } else {
       void this.next();
     }
@@ -220,10 +251,17 @@ export class ItemClient {
     try {
       d.sink = await open();
     } catch (err) {
-      await this.fail(d, err instanceof Error ? err.message : "Could not save file");
+      await this.fail(
+        d,
+        err instanceof Error ? err.message : "Could not save file",
+      );
       return;
     }
-    if (offset > 0 && d.sink.startAt !== undefined && d.sink.startAt !== offset) {
+    if (
+      offset > 0 &&
+      d.sink.startAt !== undefined &&
+      d.sink.startAt !== offset
+    ) {
       // The partial file wasn't what we expected; the sink started over.
       offset = 0;
       d.received = d.written = d.lastAck = 0;
@@ -271,7 +309,10 @@ export class ItemClient {
         await d.sink!.write(chunk);
       } catch (err) {
         this.send({ t: "cancel", id: d.meta.id });
-        await this.fail(d, err instanceof Error ? err.message : "Could not save file");
+        await this.fail(
+          d,
+          err instanceof Error ? err.message : "Could not save file",
+        );
         return;
       }
       d.written += len;
@@ -300,7 +341,10 @@ export class ItemClient {
     const verifiable = !!expected && !!actual;
     if (verifiable && actual !== expected) {
       this.send({ t: "done", id: d.meta.id, ok: false });
-      await this.fail(d, "Integrity check failed: the file was corrupted in transit");
+      await this.fail(
+        d,
+        "Integrity check failed: the file was corrupted in transit",
+      );
       return;
     }
 
@@ -315,7 +359,10 @@ export class ItemClient {
       });
     } catch (err) {
       this.send({ t: "done", id: d.meta.id, ok: false });
-      await this.fail(d, err instanceof Error ? err.message : "Could not save file");
+      await this.fail(
+        d,
+        err instanceof Error ? err.message : "Could not save file",
+      );
       return;
     }
     this.active = undefined;
@@ -324,11 +371,18 @@ export class ItemClient {
 
   private async fail(d: Download, error: string, status: ItemStatus = "error") {
     if (d.failed) return;
-    if (status === "error") console.warn(`[kabootar] item ${d.meta.id} failed after ${d.written}/${d.received} bytes:`, error);
+    if (status === "error")
+      console.warn(
+        `[kabootar] item ${d.meta.id} failed after ${d.written}/${d.received} bytes:`,
+        error,
+      );
     d.failed = true;
     d.accepting = false;
     await d.sink?.abort().catch(() => {});
-    this.setState(d.meta.id, { status, error: status === "error" ? error : undefined });
+    this.setState(d.meta.id, {
+      status,
+      error: status === "error" ? error : undefined,
+    });
     if (this.active === d) this.active = undefined;
     void this.next();
   }

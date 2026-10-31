@@ -53,7 +53,8 @@ export function resumableDirs(): Set<string> {
   for (let i = 0; i < sessionStorage.length; i++) {
     const k = sessionStorage.key(i);
     if (!k?.startsWith("kabootar:dl:")) continue;
-    for (const d of Object.values(read<Record<number, SavedDownload>>(k) ?? {})) dirs.add(d.dir);
+    for (const d of Object.values(read<Record<number, SavedDownload>>(k) ?? {}))
+      dirs.add(d.dir);
   }
   return dirs;
 }
@@ -90,6 +91,8 @@ export interface SavedShare {
 
 const shareKey = (roomId: string) => `kabootar:send:${roomId}`;
 
-export const savedShare = (roomId: string) => read<SavedShare>(shareKey(roomId));
+export const savedShare = (roomId: string) =>
+  read<SavedShare>(shareKey(roomId));
 export const saveShare = (s: SavedShare) => write(shareKey(s.created.id), s);
-export const dropShare = (roomId: string) => sessionStorage.removeItem(shareKey(roomId));
+export const dropShare = (roomId: string) =>
+  sessionStorage.removeItem(shareKey(roomId));

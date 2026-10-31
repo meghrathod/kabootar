@@ -24,9 +24,11 @@ async function open(dir: string, name: string, at = 0) {
   dirHandle = await parentHandle.getDirectoryHandle(dir, { create: true });
   dirName = dir;
   fileHandle = await dirHandle.getFileHandle(name, { create: true });
-  handle = await (fileHandle as FileSystemFileHandle & {
-    createSyncAccessHandle(): Promise<FileSystemSyncAccessHandle>;
-  }).createSyncAccessHandle();
+  handle = await (
+    fileHandle as FileSystemFileHandle & {
+      createSyncAccessHandle(): Promise<FileSystemSyncAccessHandle>;
+    }
+  ).createSyncAccessHandle();
   // Resuming keeps the bytes before `at`; anything after it is a partial
   // chunk from the interrupted session and is discarded. If the file is
   // shorter than expected, start over rather than leave a gap.
@@ -46,7 +48,9 @@ self.onmessage = async (e: MessageEvent<Req>) => {
         const view = new Uint8Array(req.data);
         let written = 0;
         while (written < view.byteLength) {
-          written += handle.write(view.subarray(written), { at: position + written });
+          written += handle.write(view.subarray(written), {
+            at: position + written,
+          });
         }
         position += view.byteLength;
         break;
@@ -59,11 +63,18 @@ self.onmessage = async (e: MessageEvent<Req>) => {
       case "abort":
         handle?.close();
         handle = undefined;
-        if (parentHandle && dirName) await parentHandle.removeEntry(dirName, { recursive: true }).catch(() => {});
+        if (parentHandle && dirName)
+          await parentHandle
+            .removeEntry(dirName, { recursive: true })
+            .catch(() => {});
         break;
     }
     self.postMessage({ rid: req.rid, ok: true, position });
   } catch (err) {
-    self.postMessage({ rid: req.rid, ok: false, error: err instanceof Error ? err.message : String(err) });
+    self.postMessage({
+      rid: req.rid,
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 };

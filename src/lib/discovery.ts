@@ -12,7 +12,11 @@ export interface DiscoveryState {
 
 /** Live list of shares on the same network, with automatic reconnect. */
 export class Discovery {
-  readonly store = new Store<DiscoveryState>({ rooms: [], status: "connecting", hidden: false });
+  readonly store = new Store<DiscoveryState>({
+    rooms: [],
+    status: "connecting",
+    hidden: false,
+  });
   private ws: WebSocket | undefined;
   private stopped = false;
   private attempt = 0;
@@ -43,13 +47,21 @@ export class Discovery {
       try {
         const msg = JSON.parse(e.data);
         if (msg.t === "network") {
-          console.info("[kabootar] nearby network (receiver):", (msg.keys as string[]).join(", ") || "none", msg.hidden ? "(hidden by a privacy relay)" : "");
+          console.info(
+            "[kabootar] nearby network (receiver):",
+            (msg.keys as string[]).join(", ") || "none",
+            msg.hidden ? "(hidden by a privacy relay)" : "",
+          );
           this.store.set({ hidden: !!msg.hidden });
         } else if (msg.t === "add" && msg.room) {
-          const rooms = this.store.get().rooms.filter((r) => r.id !== msg.room.id);
+          const rooms = this.store
+            .get()
+            .rooms.filter((r) => r.id !== msg.room.id);
           this.store.set({ rooms: [...rooms, msg.room] });
         } else if (msg.t === "remove") {
-          this.store.set({ rooms: this.store.get().rooms.filter((r) => r.id !== msg.id) });
+          this.store.set({
+            rooms: this.store.get().rooms.filter((r) => r.id !== msg.id),
+          });
         }
       } catch {
         // ignore malformed messages
@@ -58,9 +70,15 @@ export class Discovery {
     ws.onclose = () => {
       if (this.stopped || this.ws !== ws) return;
       this.store.set({ status: "reconnecting" });
-      this.timer = setTimeout(() => this.connect(), Math.min(10_000, 500 * 2 ** this.attempt++));
+      this.timer = setTimeout(
+        () => this.connect(),
+        Math.min(10_000, 500 * 2 ** this.attempt++),
+      );
     };
-    this.beat = setInterval(() => ws.readyState === WebSocket.OPEN && ws.send('{"t":"ping"}'), 20_000);
+    this.beat = setInterval(
+      () => ws.readyState === WebSocket.OPEN && ws.send('{"t":"ping"}'),
+      20_000,
+    );
   }
 
   private cleanup() {

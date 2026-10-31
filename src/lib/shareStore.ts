@@ -19,14 +19,18 @@ function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB, 2);
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
+      if (!req.result.objectStoreNames.contains(STORE))
+        req.result.createObjectStore(STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
 
-export async function putShared(id: string, payload: SharedPayload): Promise<void> {
+export async function putShared(
+  id: string,
+  payload: SharedPayload,
+): Promise<void> {
   const db = await open();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
@@ -37,18 +41,22 @@ export async function putShared(id: string, payload: SharedPayload): Promise<voi
   db.close();
 }
 
-export async function takeShared(id: string): Promise<SharedPayload | undefined> {
+export async function takeShared(
+  id: string,
+): Promise<SharedPayload | undefined> {
   const db = await open();
-  const value = await new Promise<SharedPayload | undefined>((resolve, reject) => {
-    const tx = db.transaction(STORE, "readwrite");
-    const store = tx.objectStore(STORE);
-    const req = store.get(id);
-    req.onsuccess = () => {
-      store.delete(id);
-      resolve(req.result as SharedPayload | undefined);
-    };
-    req.onerror = () => reject(req.error);
-  });
+  const value = await new Promise<SharedPayload | undefined>(
+    (resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const store = tx.objectStore(STORE);
+      const req = store.get(id);
+      req.onsuccess = () => {
+        store.delete(id);
+        resolve(req.result as SharedPayload | undefined);
+      };
+      req.onerror = () => reject(req.error);
+    },
+  );
   db.close();
   return value;
 }
@@ -63,7 +71,8 @@ export async function pruneShared(): Promise<void> {
     req.onsuccess = () => {
       const cur = req.result;
       if (!cur) return;
-      if (Date.now() - (cur.value as SharedPayload).timestamp > 86_400_000) cur.delete();
+      if (Date.now() - (cur.value as SharedPayload).timestamp > 86_400_000)
+        cur.delete();
       cur.continue();
     };
     tx.oncomplete = () => resolve();

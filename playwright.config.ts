@@ -11,7 +11,10 @@ export default defineConfig({
     baseURL: `http://localhost:${port}`,
     trace: "retain-on-failure",
     launchOptions: {
-      args: ["--use-fake-ui-for-media-stream", "--disable-features=WebRtcHideLocalIpsWithMdns"],
+      args: [
+        "--use-fake-ui-for-media-stream",
+        "--disable-features=WebRtcHideLocalIpsWithMdns",
+      ],
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

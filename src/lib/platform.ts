@@ -1,10 +1,14 @@
 const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
 
 export const isIOS =
-  /iPad|iPhone|iPod/.test(ua) || (ua.includes("Macintosh") && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1);
+  /iPad|iPhone|iPod/.test(ua) ||
+  (ua.includes("Macintosh") &&
+    typeof navigator !== "undefined" &&
+    navigator.maxTouchPoints > 1);
 export const isAndroid = /Android/.test(ua);
 export const isMobile = isIOS || isAndroid;
-export const isSafari = /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|Android/.test(ua);
+export const isSafari =
+  /Safari/.test(ua) && !/Chrome|Chromium|CriOS|FxiOS|Edg|Android/.test(ua);
 export const isFirefox = /Firefox|FxiOS/.test(ua);
 
 export const isStandalone =
@@ -12,15 +16,20 @@ export const isStandalone =
   (window.matchMedia?.("(display-mode: standalone)").matches ||
     (navigator as Navigator & { standalone?: boolean }).standalone === true);
 
-export const hasSavePicker = typeof window !== "undefined" && "showSaveFilePicker" in window && !isMobile;
-export const hasDirectoryPicker = typeof window !== "undefined" && "showDirectoryPicker" in window && !isMobile;
-export const hasOPFS = typeof navigator !== "undefined" && !!navigator.storage?.getDirectory;
+export const hasSavePicker =
+  typeof window !== "undefined" && "showSaveFilePicker" in window && !isMobile;
+export const hasDirectoryPicker =
+  typeof window !== "undefined" && "showDirectoryPicker" in window && !isMobile;
+export const hasOPFS =
+  typeof navigator !== "undefined" && !!navigator.storage?.getDirectory;
 export const canShareFiles =
   typeof navigator !== "undefined" &&
   !!navigator.canShare &&
   (() => {
     try {
-      return navigator.canShare({ files: [new File([""], "x.txt", { type: "text/plain" })] });
+      return navigator.canShare({
+        files: [new File([""], "x.txt", { type: "text/plain" })],
+      });
     } catch {
       return false;
     }
@@ -34,7 +43,8 @@ export class WakeLock {
   constructor() {
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", () => {
-        if (this.wanted && document.visibilityState === "visible") void this.acquire();
+        if (this.wanted && document.visibilityState === "visible")
+          void this.acquire();
       });
     }
   }
@@ -44,7 +54,10 @@ export class WakeLock {
     if (this.sentinel || !("wakeLock" in navigator)) return;
     try {
       this.sentinel = await navigator.wakeLock.request("screen");
-      this.sentinel.addEventListener("release", () => (this.sentinel = undefined));
+      this.sentinel.addEventListener(
+        "release",
+        () => (this.sentinel = undefined),
+      );
     } catch {
       // Denied (e.g. low battery); transfers still work while visible.
     }

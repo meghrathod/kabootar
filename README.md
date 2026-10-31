@@ -2,7 +2,7 @@
 
 Peer-to-peer file sharing in the browser. Files go straight from one device to another over an encrypted WebRTC data channel, so nothing is uploaded to a server and there's no size limit beyond the receiver's disk.
 
-> *Kabootar* (कबूतर) is Hindi for pigeon, after the carrier pigeons that once delivered messages.
+> _Kabootar_ (कबूतर) is Hindi for pigeon, after the carrier pigeons that once delivered messages.
 
 - **Send** files, folders or text; receivers open a link, scan a QR code or type a 6-digit code.
 - **Nearby**: devices on the same network see each other's shares.
@@ -10,6 +10,7 @@ Peer-to-peer file sharing in the browser. Files go straight from one device to a
 - **Resumable**: transfers survive network hiccups (ICE restart) and reconnects (resume from the last byte).
 - **Verified**: every file is checked with SHA-256 after transfer.
 - **Installable PWA**: works offline, and on Android it appears in the system share sheet.
+
 ## How it works
 
 The app and its signalling run on Cloudflare: a Worker serves the PWA and API, one Durable Object per share relays WebRTC offers and answers, and Cloudflare Realtime TURN relays traffic when a direct connection isn't possible. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -47,7 +48,6 @@ yarn test:e2e      # two browsers doing a real WebRTC transfer (needs `yarn buil
 ## Deployment
 
 `yarn deploy` after a one-time setup; CI deploys every push to `develop`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-
 
 ## License
 

@@ -5,7 +5,15 @@ import { Icon } from "../components/Icon";
 import { toast } from "../components/Toasts";
 import { Spinner } from "../components/ui";
 import { errorMessage } from "../lib/api";
-import { addFiles, addText, clearDraft, draft, filesFromDataTransfer, removeFile, removeText } from "../lib/draft";
+import {
+  addFiles,
+  addText,
+  clearDraft,
+  draft,
+  filesFromDataTransfer,
+  removeFile,
+  removeText,
+} from "../lib/draft";
 import { formatBytes } from "../lib/format";
 import { SenderSession, senderSlot } from "../lib/sender";
 import { pruneShared, takeShared } from "../lib/shareStore";
@@ -115,28 +123,37 @@ export default function Home() {
     }
   };
 
-  const live = session && session.store.get().status === "live" ? session : undefined;
+  const live =
+    session && session.store.get().status === "live" ? session : undefined;
 
   return (
     <div className="flex flex-col">
-
       {live && (
-        <Link to={`/${live.id}${new URL(live.store.get().link).hash}`} className="panel mb-4 flex items-center gap-3 px-4 py-3 text-sm">
+        <Link
+          to={`/${live.id}${new URL(live.store.get().link).hash}`}
+          className="panel mb-4 flex items-center gap-3 px-4 py-3 text-sm"
+        >
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          <span className="flex-1">Sharing as {live.store.get().room.name}</span>
+          <span className="flex-1">
+            Sharing as {live.store.get().room.name}
+          </span>
           <span className="text-sky">Open</span>
         </Link>
       )}
 
       <section className="panel animate-rise p-3">
         {count === 0 ? (
-          <div className={`airmail transition ${dragging ? "brightness-125" : ""}`}>
+          <div
+            className={`airmail transition ${dragging ? "brightness-125" : ""}`}
+          >
             <button
               onClick={() => fileInput.current?.click()}
               className="flex w-full flex-col items-center gap-2 px-6 py-10 transition hover:bg-ink-3"
             >
               <Icon name="upload" className="h-6 w-6 text-sky" />
-              <span className="font-display text-xl font-semibold">Choose files</span>
+              <span className="font-display text-xl font-semibold">
+                Choose files
+              </span>
               <span className="label">or drop · paste</span>
             </button>
           </div>
@@ -147,18 +164,33 @@ export default function Home() {
                 <Icon name="file" className="h-5 w-5 shrink-0 text-white/50" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{f.path ?? f.file.name}</p>
-                  <p className="text-xs text-white/45">{formatBytes(f.file.size)}</p>
+                  <p className="text-xs text-white/45">
+                    {formatBytes(f.file.size)}
+                  </p>
                 </div>
-                <button className="icon-btn" onClick={() => removeFile(i)} aria-label={`Remove ${f.file.name}`}>
+                <button
+                  className="icon-btn"
+                  onClick={() => removeFile(i)}
+                  aria-label={`Remove ${f.file.name}`}
+                >
                   <Icon name="x" className="h-4 w-4" />
                 </button>
               </li>
             ))}
             {d.texts.map((t, i) => (
               <li key={`t${i}`} className="flex items-center gap-3 py-2.5">
-                <Icon name={/^https?:\/\//.test(t) ? "link" : "text"} className="h-5 w-5 shrink-0 text-white/50" />
-                <p className="line-clamp-2 min-w-0 flex-1 text-sm text-white/80">{t}</p>
-                <button className="icon-btn" onClick={() => removeText(i)} aria-label="Remove text">
+                <Icon
+                  name={/^https?:\/\//.test(t) ? "link" : "text"}
+                  className="h-5 w-5 shrink-0 text-white/50"
+                />
+                <p className="line-clamp-2 min-w-0 flex-1 text-sm text-white/80">
+                  {t}
+                </p>
+                <button
+                  className="icon-btn"
+                  onClick={() => removeText(i)}
+                  aria-label="Remove text"
+                >
                   <Icon name="x" className="h-4 w-4" />
                 </button>
               </li>
@@ -178,7 +210,10 @@ export default function Home() {
               className="input resize-none"
             />
             <div className="flex justify-end gap-2">
-              <button className="btn-ghost py-2" onClick={() => setComposing(false)}>
+              <button
+                className="btn-ghost py-2"
+                onClick={() => setComposing(false)}
+              >
                 Cancel
               </button>
               <button
@@ -198,17 +233,30 @@ export default function Home() {
 
         <div className="mt-2 flex items-center gap-1 px-1 text-sm">
           {count > 0 && (
-            <button className="btn-ghost px-3 py-1.5" onClick={() => fileInput.current?.click()}>
+            <button
+              className="btn-ghost px-3 py-1.5"
+              onClick={() => fileInput.current?.click()}
+            >
               <Icon name="plus" className="h-4 w-4" /> Files
             </button>
           )}
-          <button className="btn-ghost px-3 py-1.5" onClick={() => folderInput.current?.click()}>
+          <button
+            className="btn-ghost px-3 py-1.5"
+            onClick={() => folderInput.current?.click()}
+          >
             <Icon name="folder" className="h-4 w-4" /> Folder
           </button>
-          <button className="btn-ghost px-3 py-1.5" onClick={() => setComposing(true)}>
+          <button
+            className="btn-ghost px-3 py-1.5"
+            onClick={() => setComposing(true)}
+          >
             <Icon name="text" className="h-4 w-4" /> Text
           </button>
-          {count > 0 && <span className="ml-auto text-xs text-white/45">{formatBytes(total)}</span>}
+          {count > 0 && (
+            <span className="ml-auto text-xs text-white/45">
+              {formatBytes(total)}
+            </span>
+          )}
         </div>
       </section>
 
@@ -223,7 +271,11 @@ export default function Home() {
             />
             Show to nearby devices
           </label>
-          <button className="btn-primary py-4 text-base" onClick={start} disabled={starting}>
+          <button
+            className="btn-primary py-4 text-base"
+            onClick={start}
+            disabled={starting}
+          >
             {starting ? <Spinner /> : <Icon name="share" />}
             Send
           </button>

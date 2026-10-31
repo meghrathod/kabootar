@@ -34,7 +34,14 @@ interface ClientMsg {
   data?: unknown;
   /** A reconnecting receiver's previous id. */
   resume?: string;
-  restore?: { name?: string; emoji?: string; pin?: string; discoverable?: boolean; ip?: string; ip6?: string };
+  restore?: {
+    name?: string;
+    emoji?: string;
+    pin?: string;
+    discoverable?: boolean;
+    ip?: string;
+    ip6?: string;
+  };
 }
 
 const PING = '{"t":"ping"}';
@@ -84,7 +91,9 @@ export class Room extends DurableObject<Env> {
   // -------------------------------------------------------------------------
 
   private sockets() {
-    return this.ctx.getWebSockets().map((ws) => ({ ws, att: ws.deserializeAttachment() as Attachment }));
+    return this.ctx
+      .getWebSockets()
+      .map((ws) => ({ ws, att: ws.deserializeAttachment() as Attachment }));
   }
 
   private masters() {
@@ -143,7 +152,8 @@ export class Room extends DurableObject<Env> {
       if (msg.t === "signal" && typeof msg.to === "string") {
         const peer = this.peers().find((p) => p.att.peerId === msg.to);
         if (peer) this.send(peer.ws, { t: "signal", data: msg.data });
-        else this.send(ws, { t: "error", code: "peer_not_found", peer: msg.to });
+        else
+          this.send(ws, { t: "error", code: "peer_not_found", peer: msg.to });
       } else if (msg.t === "close") {
         await this.closeRoom();
       }
@@ -152,8 +162,10 @@ export class Room extends DurableObject<Env> {
 
     if (msg.t === "signal") {
       const masters = this.masters();
-      if (masters.length === 0) return this.send(ws, { t: "error", code: "master_absent" });
-      for (const m of masters) this.send(m.ws, { t: "signal", from: att.peerId, data: msg.data });
+      if (masters.length === 0)
+        return this.send(ws, { t: "error", code: "master_absent" });
+      for (const m of masters)
+        this.send(m.ws, { t: "signal", from: att.peerId, data: msg.data });
     }
   }
 
@@ -161,7 +173,8 @@ export class Room extends DurableObject<Env> {
     const id = this.meta?.id ?? att.roomId;
 
     if (msg.role === "master") {
-      if (!(await checkKey(this.env.SERVER_SECRET, "m", id, msg.key))) return this.fail(ws, "invalid_key");
+      if (!(await checkKey(this.env.SERVER_SECRET, "m", id, msg.key)))
+        return this.fail(ws, "invalid_key");
       if (!this.meta) {
         // The room was forgotten (expired storage, manual cleanup): the
         // sender holds the master key, so it may re-create it.
@@ -201,15 +214,22 @@ export class Room extends DurableObject<Env> {
     }
 
     if (msg.role === "peer") {
-      if (!(await checkKey(this.env.SERVER_SECRET, "c", id, msg.key))) return this.fail(ws, "invalid_key");
+      if (!(await checkKey(this.env.SERVER_SECRET, "c", id, msg.key)))
+        return this.fail(ws, "invalid_key");
       if (!this.meta) return this.fail(ws, "room_not_found");
       // A receiver that reconnects (e.g. iOS suspended the tab) reclaims its
       // id, so the sender keeps one row and can reuse the peer connection.
       // Ids are random and only ever shared with the sender, so they can't
       // be guessed by other receivers.
-      const resume = typeof msg.resume === "string" && /^[A-Za-z0-9]{16}$/.test(msg.resume) ? msg.resume : undefined;
-      const stale = resume ? this.peers().filter((p) => p.att.peerId === resume) : [];
-      if (this.peers().length - stale.length >= maxPeers(this.env)) return this.fail(ws, "room_full");
+      const resume =
+        typeof msg.resume === "string" && /^[A-Za-z0-9]{16}$/.test(msg.resume)
+          ? msg.resume
+          : undefined;
+      const stale = resume
+        ? this.peers().filter((p) => p.att.peerId === resume)
+        : [];
+      if (this.peers().length - stale.length >= maxPeers(this.env))
+        return this.fail(ws, "room_full");
 
       let peerId = resume;
       if (!peerId) {
@@ -217,7 +237,11 @@ export class Room extends DurableObject<Env> {
         do peerId = randomID(16);
         while (taken.has(peerId));
       }
-      ws.serializeAttachment({ ...att, role: "peer", peerId } satisfies Attachment);
+      ws.serializeAttachment({
+        ...att,
+        role: "peer",
+        peerId,
+      } satisfies Attachment);
       for (const old of stale) {
         try {
           old.ws.close(4001, "replaced");
@@ -242,10 +266,22 @@ export class Room extends DurableObject<Env> {
     this.fail(ws, "bad_request");
   }
 
-  private async restore(id: string, att: Attachment, r: NonNullable<ClientMsg["restore"]>) {
+  private async restore(
+    id: string,
+    att: Attachment,
+    r: NonNullable<ClientMsg["restore"]>,
+  ) {
     const avatar = findAvatar(r.emoji) ?? randomAvatar();
-    const name = typeof r.name === "string" && r.name.length > 0 && r.name.length <= 64 ? r.name : roomName();
-    const info: RoomInfo = { id, name, emoji: avatar.emoji, color: avatar.color };
+    const name =
+      typeof r.name === "string" && r.name.length > 0 && r.name.length <= 64
+        ? r.name
+        : roomName();
+    const info: RoomInfo = {
+      id,
+      name,
+      emoji: avatar.emoji,
+      color: avatar.color,
+    };
     const pin = await this.directory.claimPin(info, r.pin);
     const now = Date.now();
     this.meta = {
@@ -258,7 +294,8 @@ export class Room extends DurableObject<Env> {
       masterGoneAt: 0,
     };
     await this.save();
-    if (r.discoverable) await this.directory.announce(info, discoveryKeys(att.ip, r.ip, r.ip6));
+    if (r.discoverable)
+      await this.directory.announce(info, discoveryKeys(att.ip, r.ip, r.ip6));
   }
 
   async webSocketClose(ws: WebSocket, code: number, reason: string) {
@@ -281,12 +318,17 @@ export class Room extends DurableObject<Env> {
       if (this.masters().some((m) => m.ws !== ws)) return;
       this.meta.masterGoneAt = Date.now();
       await this.save();
-      for (const p of this.peers()) this.send(p.ws, { t: "master", online: false });
-      await this.ctx.storage.setAlarm(this.meta.masterGoneAt + masterGrace(this.env));
+      for (const p of this.peers())
+        this.send(p.ws, { t: "master", online: false });
+      await this.ctx.storage.setAlarm(
+        this.meta.masterGoneAt + masterGrace(this.env),
+      );
     } else if (att.role === "peer") {
       // Replaced by a reconnect of the same receiver: not a departure.
-      if (this.peers().some((p) => p.ws !== ws && p.att.peerId === att.peerId)) return;
-      for (const m of this.masters()) this.send(m.ws, { t: "leave", peer: att.peerId });
+      if (this.peers().some((p) => p.ws !== ws && p.att.peerId === att.peerId))
+        return;
+      for (const m of this.masters())
+        this.send(m.ws, { t: "leave", peer: att.peerId });
     }
   }
 
@@ -301,7 +343,9 @@ export class Room extends DurableObject<Env> {
     const expired =
       now >= meta.expiresAt ||
       (!meta.masterSeen && now - meta.createdAt >= grace) ||
-      (!masterPresent && meta.masterGoneAt > 0 && now - meta.masterGoneAt >= grace);
+      (!masterPresent &&
+        meta.masterGoneAt > 0 &&
+        now - meta.masterGoneAt >= grace);
     if (expired) {
       await this.closeRoom();
       return;
@@ -309,7 +353,8 @@ export class Room extends DurableObject<Env> {
 
     let next = meta.expiresAt;
     if (!meta.masterSeen) next = Math.min(next, meta.createdAt + grace);
-    else if (!masterPresent && meta.masterGoneAt > 0) next = Math.min(next, meta.masterGoneAt + grace);
+    else if (!masterPresent && meta.masterGoneAt > 0)
+      next = Math.min(next, meta.masterGoneAt + grace);
     await this.ctx.storage.setAlarm(next);
   }
 

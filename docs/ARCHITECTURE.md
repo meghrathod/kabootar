@@ -13,26 +13,26 @@
 
 ## Repository layout
 
-| Path | What |
-|---|---|
-| `src/` | React PWA |
-| `src/lib/transfer/` | Transport-agnostic transfer protocol (`ItemServer` sends, `ItemClient` receives) |
-| `src/lib/sender.ts`, `receiver.ts` | WebRTC sessions: peer connections, ICE restart, reconnects |
-| `src/lib/signal.ts` | Signalling websocket with reconnect and heartbeat |
-| `src/lib/sinks/` | Where received bytes go: save picker, service-worker stream, OPFS, memory |
-| `src/sw.ts` | Service worker: offline shell, share target, streamed downloads |
-| `worker/src/` | Cloudflare Worker and durable objects |
-| `e2e/` | Playwright tests |
+| Path                               | What                                                                             |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `src/`                             | React PWA                                                                        |
+| `src/lib/transfer/`                | Transport-agnostic transfer protocol (`ItemServer` sends, `ItemClient` receives) |
+| `src/lib/sender.ts`, `receiver.ts` | WebRTC sessions: peer connections, ICE restart, reconnects                       |
+| `src/lib/signal.ts`                | Signalling websocket with reconnect and heartbeat                                |
+| `src/lib/sinks/`                   | Where received bytes go: save picker, service-worker stream, OPFS, memory        |
+| `src/sw.ts`                        | Service worker: offline shell, share target, streamed downloads                  |
+| `worker/src/`                      | Cloudflare Worker and durable objects                                            |
+| `e2e/`                             | Playwright tests                                                                 |
 
 ## Signalling
 
 ### HTTP
 
-| Request | Response |
-|---|---|
+| Request                                 | Response                                                         |
+| --------------------------------------- | ---------------------------------------------------------------- |
 | `POST /api/rooms` `{discoverable, ip?}` | `{id, name, emoji, color, masterKey, clientKey, pin, expiresAt}` |
-| `POST /api/join` `{pin, roomId?}` | `{room, clientKey}`, rate limited per client |
-| `GET /api/info` | `{version, turn, maxPeers}` |
+| `POST /api/join` `{pin, roomId?}`       | `{room, clientKey}`, rate limited per client                     |
+| `GET /api/info`                         | `{version, turn, maxPeers}`                                      |
 
 `ip` is the browser's public IPv4 address from STUN, used only to match devices for "Nearby".
 
@@ -44,14 +44,14 @@ The first client message authenticates (keys never appear in URLs):
 { "t": "auth", "role": "master" | "peer", "key": "…", "restore": { … } }
 ```
 
-| Server → client | |
-|---|---|
-| `welcome` | `{role, room, iceServers, pin?, peers?, peerId?, online?}` |
-| `join` / `leave` | (to sender) a receiver connected / disconnected |
-| `signal` | relayed WebRTC payload (`from` is set for the sender) |
-| `master` | (to receivers) sender online/offline |
-| `closed` | the share ended |
-| `error` | `{code}`: `invalid_key`, `room_not_found`, `room_full`, … |
+| Server → client  |                                                            |
+| ---------------- | ---------------------------------------------------------- |
+| `welcome`        | `{role, room, iceServers, pin?, peers?, peerId?, online?}` |
+| `join` / `leave` | (to sender) a receiver connected / disconnected            |
+| `signal`         | relayed WebRTC payload (`from` is set for the sender)      |
+| `master`         | (to receivers) sender online/offline                       |
+| `closed`         | the share ended                                            |
+| `error`          | `{code}`: `invalid_key`, `room_not_found`, `room_full`, …  |
 
 Clients send `signal` (`to` is required from the sender), `close` (sender ends the share) and the heartbeat `{"t":"ping"}`. The runtime answers heartbeats directly, so they don't wake the durable object.
 
@@ -85,11 +85,11 @@ end {id, sha256}       ──▶
 
 ## Receiving large files
 
-| Browser | Strategy |
-|---|---|
-| Chromium desktop | File System Access API: writes directly to the chosen file or folder |
-| Chrome Android, Firefox | Service-worker streamed download |
-| Safari macOS / iOS | Origin Private File System (worker + sync access handle), then save via download or the share sheet |
-| Fallback | In-memory blob |
+| Browser                 | Strategy                                                                                            |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| Chromium desktop        | File System Access API: writes directly to the chosen file or folder                                |
+| Chrome Android, Firefox | Service-worker streamed download                                                                    |
+| Safari macOS / iOS      | Origin Private File System (worker + sync access handle), then save via download or the share sheet |
+| Fallback                | In-memory blob                                                                                      |
 
 iOS has no save picker, so writing to private storage first is what lets it receive files larger than its in-memory blob limit.

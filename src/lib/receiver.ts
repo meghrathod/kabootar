@@ -2,10 +2,29 @@ import { errorMessage, type RoomInfo } from "./api";
 import { fallbackIceServers } from "./config";
 import { SpeedMeter } from "./format";
 import { WakeLock, isIOS } from "./platform";
-import { CandidateQueue, type Route, type SignalData, detectRoute, hasTurn, isSignal } from "./rtc";
+import {
+  CandidateQueue,
+  type Route,
+  type SignalData,
+  detectRoute,
+  hasTurn,
+  isSignal,
+} from "./rtc";
 import { SignalSocket, type SignalStatus } from "./signal";
-import { OPFSSink, type SinkTarget, bestStrategy, downloadFile, openSink } from "./sinks";
-import { dropDownload, fromBase64, saveDownload, savedDownloads, toBase64 } from "./resume";
+import {
+  OPFSSink,
+  type SinkTarget,
+  bestStrategy,
+  downloadFile,
+  openSink,
+} from "./sinks";
+import {
+  dropDownload,
+  fromBase64,
+  saveDownload,
+  savedDownloads,
+  toBase64,
+} from "./resume";
 import { Store } from "./store";
 import { ItemClient, type ItemState } from "./transfer/client";
 import type { FileMeta, ItemMeta } from "./transfer/protocol";
@@ -40,7 +59,16 @@ const MAX_RESTARTS = 4;
 
 export class ReceiverSession {
   readonly store = new Store<ReceiverState>(
-    { status: "connecting", signal: "connecting", senderOnline: true, items: [], states: {}, relay: false, speed: 0, received: 0 },
+    {
+      status: "connecting",
+      signal: "connecting",
+      senderOnline: true,
+      items: [],
+      states: {},
+      relay: false,
+      speed: 0,
+      received: 0,
+    },
     120,
   );
   readonly client: ItemClient;
@@ -74,26 +102,48 @@ export class ReceiverSession {
       onState: (id, s) => this.onItemState(id, s),
       onCheckpoint: (id, written, state) => {
         const dir = this.opfsDirs.get(id);
-        const meta = this.store.get().items.find((i): i is FileMeta => i.id === id && i.kind === "file");
+        const meta = this.store
+          .get()
+          .items.find((i): i is FileMeta => i.id === id && i.kind === "file");
         if (!dir || !meta) return;
         const st = state();
-        saveDownload(roomId, id, { dir, name: meta.name, size: meta.size, written, state: st && toBase64(st) });
+        saveDownload(roomId, id, {
+          dir,
+          name: meta.name,
+          size: meta.size,
+          written,
+          state: st && toBase64(st),
+        });
       },
     });
 
     // Survives reconnects and, via sessionStorage, iOS reloading the tab.
     const idKey = `kabootar:peer:${roomId}`;
     this.peerId = sessionStorage.getItem(idKey) ?? undefined;
-    this.signal = new SignalSocket(roomId, () => ({ role: "peer", key, resume: this.peerId }));
+    this.signal = new SignalSocket(roomId, () => ({
+      role: "peer",
+      key,
+      resume: this.peerId,
+    }));
     this.signal.on("status", (signal) => {
       this.store.set({ signal }, true);
-      if (signal === "reconnecting" && this.store.get().status === "connecting") return;
+      if (signal === "reconnecting" && this.store.get().status === "connecting")
+        return;
     });
     this.signal.on("welcome", (w) => {
       this.peerId = w.peerId;
       if (w.peerId) sessionStorage.setItem(idKey, w.peerId);
-      this.iceServers = w.iceServers?.length ? w.iceServers : fallbackIceServers;
-      this.store.set({ room: w.room, senderOnline: w.online !== false, relay: hasTurn(this.iceServers) }, true);
+      this.iceServers = w.iceServers?.length
+        ? w.iceServers
+        : fallbackIceServers;
+      this.store.set(
+        {
+          room: w.room,
+          senderOnline: w.online !== false,
+          relay: hasTurn(this.iceServers),
+        },
+        true,
+      );
       if (!this.healthy) {
         this.setStatus("waiting");
         this.armWatchdog();
@@ -132,7 +182,10 @@ export class ReceiverSession {
         this.progressAt.set(Number(id), { received: st.received, at: now });
       } else if (now - p.at > STALL_TIMEOUT) {
         this.progressAt.delete(Number(id));
-        void this.client.abort(Number(id), "Transfer stalled. Tap download to retry.");
+        void this.client.abort(
+          Number(id),
+          "Transfer stalled. Tap download to retry.",
+        );
       }
     }
   }
@@ -152,7 +205,11 @@ export class ReceiverSession {
       // An offer from a different sender connection (sender reloaded or
       // rebuilt the link) needs a fresh peer connection; the same link means
       // renegotiation (ICE restart) of the current one.
-      if (!this.pc || data.link !== this.pcLink || ["failed", "closed"].includes(this.pc.connectionState)) {
+      if (
+        !this.pc ||
+        data.link !== this.pcLink ||
+        ["failed", "closed"].includes(this.pc.connectionState)
+      ) {
         this.newConnection(data.link);
       }
       const pc = this.pc!;
@@ -160,7 +217,11 @@ export class ReceiverSession {
         await pc.setRemoteDescription(data.sdp);
         await this.ice!.flush();
         await pc.setLocalDescription(await pc.createAnswer());
-        this.signal.signal({ kind: "answer", sdp: pc.localDescription!.toJSON(), link: data.link });
+        this.signal.signal({
+          kind: "answer",
+          sdp: pc.localDescription!.toJSON(),
+          link: data.link,
+        });
       } catch (err) {
         console.warn("answer failed", err);
       }
@@ -177,7 +238,8 @@ export class ReceiverSession {
     this.ice = new CandidateQueue(pc);
 
     pc.onicecandidate = (e) => {
-      if (e.candidate && this.pc === pc) this.signal.signal({ kind: "ice", candidate: e.candidate.toJSON() });
+      if (e.candidate && this.pc === pc)
+        this.signal.signal({ kind: "ice", candidate: e.candidate.toJSON() });
     };
     pc.ondatachannel = (e) => {
       const dc = e.channel;
@@ -198,7 +260,8 @@ export class ReceiverSession {
       if (this.pc !== pc) return;
       if (pc.connectionState === "failed") this.onConnectionLost();
       if (pc.connectionState === "disconnected") this.setStatus("reconnecting");
-      if (pc.connectionState === "connected" && this.client.connected) this.setStatus("connected");
+      if (pc.connectionState === "connected" && this.client.connected)
+        this.setStatus("connected");
     };
   }
 
@@ -226,28 +289,40 @@ export class ReceiverSession {
 
   private armWatchdog() {
     clearTimeout(this.watchdog);
-    this.watchdog = setTimeout(() => {
-      if (this.healthy || this.ended) return;
-      if (this.store.get().senderOnline && this.signal.status === "open") this.requestRestart();
-      this.armWatchdog();
-    }, CONNECT_WATCHDOG * (1 + this.restarts * 0.5));
+    this.watchdog = setTimeout(
+      () => {
+        if (this.healthy || this.ended) return;
+        if (this.store.get().senderOnline && this.signal.status === "open")
+          this.requestRestart();
+        this.armWatchdog();
+      },
+      CONNECT_WATCHDOG * (1 + this.restarts * 0.5),
+    );
   }
 
   /** After a reload, continue downloads that were going to device storage. */
   private resumeSaved(items: ItemMeta[]) {
     for (const [key, saved] of Object.entries(savedDownloads(this.roomId))) {
       const id = Number(key);
-      const meta = items.find((i): i is FileMeta => i.id === id && i.kind === "file");
+      const meta = items.find(
+        (i): i is FileMeta => i.id === id && i.kind === "file",
+      );
       if (!meta || meta.name !== saved.name || meta.size !== saved.size) {
         dropDownload(this.roomId, id);
         continue;
       }
-      console.info(`[kabootar] resuming "${meta.name}" from byte ${saved.written} after reload`);
+      console.info(
+        `[kabootar] resuming "${meta.name}" from byte ${saved.written} after reload`,
+      );
       this.opfsDirs.set(id, saved.dir);
-      this.client.download(id, () => OPFSSink.open(meta, { dir: saved.dir, offset: saved.written }), {
-        offset: saved.written,
-        hashState: saved.state ? fromBase64(saved.state) : undefined,
-      });
+      this.client.download(
+        id,
+        () => OPFSSink.open(meta, { dir: saved.dir, offset: saved.written }),
+        {
+          offset: saved.written,
+          hashState: saved.state ? fromBase64(saved.state) : undefined,
+        },
+      );
     }
   }
 
@@ -260,7 +335,11 @@ export class ReceiverSession {
     let received = 0;
     for (const st of Object.values(states)) received += st.received;
     const busy = this.client.busy;
-    this.store.set({ states, received, speed: busy ? this.meter.sample(received) : 0 });
+    this.store.set({
+      states,
+      received,
+      speed: busy ? this.meter.sample(received) : 0,
+    });
     if (busy) void this.wake.acquire();
     else this.wake.release();
 
@@ -276,10 +355,13 @@ export class ReceiverSession {
   download(ids: number[], target: SinkTarget = { strategy: bestStrategy() }) {
     if (!this.client.busy) this.meter.reset(this.store.get().received);
     for (const id of ids) {
-      const meta = this.store.get().items.find((i): i is FileMeta => i.id === id && i.kind === "file");
+      const meta = this.store
+        .get()
+        .items.find((i): i is FileMeta => i.id === id && i.kind === "file");
       if (!meta) continue;
       const st = this.store.get().states[id];
-      if (st && ["queued", "receiving", "verifying"].includes(st.status)) continue;
+      if (st && ["queued", "receiving", "verifying"].includes(st.status))
+        continue;
       this.client.download(id, async () => {
         const sink = await openSink(meta, target);
         if (sink instanceof OPFSSink) this.opfsDirs.set(id, sink.dir);

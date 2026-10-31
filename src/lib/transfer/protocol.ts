@@ -77,14 +77,19 @@ export interface Channel {
   send(data: string | ArrayBuffer | ArrayBufferView<ArrayBuffer>): void;
   // Listener types are loose so RTCDataChannel and test fakes both fit.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  addEventListener(type: "message" | "open" | "close" | "bufferedamountlow", fn: (e: any) => void): void;
+  addEventListener(
+    type: "message" | "open" | "close" | "bufferedamountlow",
+    fn: (e: any) => void,
+  ): void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   removeEventListener(type: string, fn: (e: any) => void): void;
   close(): void;
 }
 
 /** Largest message both peers accept, capped for fairness between peers. */
-export function chunkSizeFor(maxMessageSize: number | null | undefined): number {
+export function chunkSizeFor(
+  maxMessageSize: number | null | undefined,
+): number {
   const max = maxMessageSize && maxMessageSize > 0 ? maxMessageSize : 64 * KiB;
   return Math.max(16 * KiB, Math.min(256 * KiB, max));
 }
@@ -126,15 +131,24 @@ export function validItems(items: unknown): ItemMeta[] {
     if (!raw || typeof raw !== "object") continue;
     const it = raw as Record<string, unknown>;
     if (typeof it.id !== "number") continue;
-    if (it.kind === "file" && typeof it.name === "string" && typeof it.size === "number" && it.size >= 0) {
+    if (
+      it.kind === "file" &&
+      typeof it.name === "string" &&
+      typeof it.size === "number" &&
+      it.size >= 0
+    ) {
       out.push({
         id: it.id,
         kind: "file",
         name: sanitizeName(it.name),
         size: it.size,
         type: typeof it.type === "string" ? it.type.slice(0, 200) : "",
-        lastModified: typeof it.lastModified === "number" ? it.lastModified : Date.now(),
-        path: typeof it.path === "string" ? sanitizePath(it.path).join("/") || undefined : undefined,
+        lastModified:
+          typeof it.lastModified === "number" ? it.lastModified : Date.now(),
+        path:
+          typeof it.path === "string"
+            ? sanitizePath(it.path).join("/") || undefined
+            : undefined,
       });
     } else if (it.kind === "text" && typeof it.text === "string") {
       out.push({ id: it.id, kind: "text", text: it.text.slice(0, MAX_TEXT) });

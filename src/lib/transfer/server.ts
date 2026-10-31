@@ -58,7 +58,11 @@ export class ItemServer {
   }
 
   start() {
-    this.send({ t: "hello", v: PROTOCOL_VERSION, items: this.items.map((i) => i.meta) });
+    this.send({
+      t: "hello",
+      v: PROTOCOL_VERSION,
+      items: this.items.map((i) => i.meta),
+    });
   }
 
   close = () => {
@@ -86,13 +90,18 @@ export class ItemServer {
 
     switch (msg.t) {
       case "get": {
-        if (typeof msg.id !== "number" || typeof msg.offset !== "number") return;
+        if (typeof msg.id !== "number" || typeof msg.offset !== "number")
+          return;
         // A new request for the active item (receiver resynced) or any
         // request while busy replaces the current transfer.
         if (this.active) this.active.cancelled = true;
         this.queue = this.queue.filter((q) => q.id !== msg.id);
         this.queue.unshift({ id: msg.id, offset: msg.offset });
-        this.opts.onEvent?.({ type: "request", id: msg.id, offset: msg.offset });
+        this.opts.onEvent?.({
+          type: "request",
+          id: msg.id,
+          offset: msg.offset,
+        });
         this.poke();
         void this.run();
         break;
@@ -100,7 +109,11 @@ export class ItemServer {
       case "ack":
         if (this.active?.id === msg.id && msg.received > this.acked) {
           this.acked = msg.received;
-          this.opts.onEvent?.({ type: "progress", id: msg.id, acked: msg.received });
+          this.opts.onEvent?.({
+            type: "progress",
+            id: msg.id,
+            acked: msg.received,
+          });
           this.poke();
         }
         break;
@@ -150,7 +163,8 @@ export class ItemServer {
 
       this.send({ t: "start", id, offset: pos });
 
-      const read = (at: number) => file.slice(at, Math.min(size, at + READ_BLOCK)).arrayBuffer();
+      const read = (at: number) =>
+        file.slice(at, Math.min(size, at + READ_BLOCK)).arrayBuffer();
       let next = pos < size ? read(pos) : undefined;
       while (next) {
         const block = await next;
@@ -172,11 +186,16 @@ export class ItemServer {
       if (active.cancelled || this.closed) return;
       this.send({ t: "end", id, sha256 });
     } catch (err) {
-      if (active.cancelled || this.closed || this.ch.readyState !== "open") return;
+      if (active.cancelled || this.closed || this.ch.readyState !== "open")
+        return;
       const message = err instanceof Error ? err.message : String(err);
       this.opts.onEvent?.({ type: "failed", id, message });
       try {
-        this.send({ t: "error", id, message: "Sender could not read the file" });
+        this.send({
+          t: "error",
+          id,
+          message: "Sender could not read the file",
+        });
       } catch {
         // channel gone
       }
@@ -188,8 +207,13 @@ export class ItemServer {
   /** Waits until the channel buffer and the receiver window have room. */
   private async capacity(active: Active): Promise<boolean> {
     for (;;) {
-      if (active.cancelled || this.closed || this.ch.readyState !== "open") return false;
-      if (this.ch.bufferedAmount <= HIGH_WATER && this.sent - this.acked <= WINDOW) return true;
+      if (active.cancelled || this.closed || this.ch.readyState !== "open")
+        return false;
+      if (
+        this.ch.bufferedAmount <= HIGH_WATER &&
+        this.sent - this.acked <= WINDOW
+      )
+        return true;
       await new Promise<void>((resolve) => {
         this.wake = resolve;
         // Safety net in case an event is missed.

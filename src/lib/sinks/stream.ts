@@ -47,11 +47,17 @@ export class StreamSink implements Sink {
         port1.close();
         reject(new Error(msg));
       };
-      let timer = setTimeout(() => fail("Service worker did not respond"), 5000);
+      let timer = setTimeout(
+        () => fail("Service worker did not respond"),
+        5000,
+      );
       port1.onmessage = (e) => {
         if (e.data?.url) {
           clearTimeout(timer);
-          timer = setTimeout(() => fail("Browser did not start the download"), 6000);
+          timer = setTimeout(
+            () => fail("Browser did not start the download"),
+            6000,
+          );
           iframe = document.createElement("iframe");
           iframe.hidden = true;
           iframe.src = e.data.url;
@@ -62,7 +68,12 @@ export class StreamSink implements Sink {
         }
       };
       sw.postMessage(
-        { type: "download", name: meta.name, size: meta.size, mime: meta.type || "application/octet-stream" },
+        {
+          type: "download",
+          name: meta.name,
+          size: meta.size,
+          mime: meta.type || "application/octet-stream",
+        },
         [port2],
       );
     });
@@ -73,7 +84,8 @@ export class StreamSink implements Sink {
   }
 
   async write(chunk: Uint8Array) {
-    while (this.credits <= 0 && !this.cancelled) await new Promise<void>((r) => this.waiters.push(r));
+    while (this.credits <= 0 && !this.cancelled)
+      await new Promise<void>((r) => this.waiters.push(r));
     if (this.cancelled) throw new Error(this.cancelled);
     this.credits--;
     const buf =

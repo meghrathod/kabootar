@@ -21,7 +21,10 @@ export { Directory, Room };
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
+    },
   });
 
 const error = (code: string, status: number) => json({ error: code }, status);
@@ -34,7 +37,8 @@ function room(env: Env, id: string) {
   return env.ROOMS.get(env.ROOMS.idFromName(id));
 }
 
-const clientIP = (req: Request) => req.headers.get("CF-Connecting-IP") ?? "unknown";
+const clientIP = (req: Request) =>
+  req.headers.get("CF-Connecting-IP") ?? "unknown";
 
 async function body<T>(req: Request): Promise<T | undefined> {
   const text = await req.text();
@@ -64,12 +68,21 @@ async function createRoom(req: Request, env: Env): Promise<Response> {
   const dir = directory(env);
   if (!(await dir.allowCreate(ip))) return error("rate_limited", 429);
 
-  const input = await body<{ discoverable?: boolean; ip?: string; ip6?: string }>(req);
+  const input = await body<{
+    discoverable?: boolean;
+    ip?: string;
+    ip6?: string;
+  }>(req);
   if (!input) return error("bad_request", 400);
 
   const id = randomID(12);
   const avatar = randomAvatar();
-  const info: RoomInfo = { id, name: roomName(), emoji: avatar.emoji, color: avatar.color };
+  const info: RoomInfo = {
+    id,
+    name: roomName(),
+    emoji: avatar.emoji,
+    color: avatar.color,
+  };
   const pin = await dir.claimPin(info);
   const now = Date.now();
   const meta: RoomMeta = {
@@ -85,7 +98,8 @@ async function createRoom(req: Request, env: Env): Promise<Response> {
   // Behind Private Relay / a VPN the addresses are shared with strangers, so
   // listing the share there would show it to the wrong people.
   const hidden = meta.discoverable && behindPrivacyRelay(req);
-  const network = meta.discoverable && !hidden ? discoveryKeys(ip, input.ip, input.ip6) : [];
+  const network =
+    meta.discoverable && !hidden ? discoveryKeys(ip, input.ip, input.ip6) : [];
   if (network.length) await dir.announce(info, network);
 
   const [masterKey, clientKey] = await Promise.all([
@@ -93,7 +107,15 @@ async function createRoom(req: Request, env: Env): Promise<Response> {
     deriveKey(env.SERVER_SECRET, "c", id),
   ]);
   return json(
-    { ...info, masterKey, clientKey, pin, expiresAt: new Date(meta.expiresAt).toISOString(), network, hidden },
+    {
+      ...info,
+      masterKey,
+      clientKey,
+      pin,
+      expiresAt: new Date(meta.expiresAt).toISOString(),
+      network,
+      hidden,
+    },
     201,
   );
 }
@@ -102,10 +124,17 @@ async function join(req: Request, env: Env): Promise<Response> {
   const input = await body<{ pin?: string; roomId?: string }>(req);
   if (!input || typeof input.pin !== "string") return error("bad_request", 400);
 
-  const result = await directory(env).lookup(input.pin, input.roomId || undefined, clientIP(req));
+  const result = await directory(env).lookup(
+    input.pin,
+    input.roomId || undefined,
+    clientIP(req),
+  );
   if (result === "rate_limited") return error("rate_limited", 429);
   if (!result) return error("room_not_found", 404);
-  return json({ room: result, clientKey: await deriveKey(env.SERVER_SECRET, "c", result.id) });
+  return json({
+    room: result,
+    clientKey: await deriveKey(env.SERVER_SECRET, "c", result.id),
+  });
 }
 
 export default {
@@ -113,15 +142,21 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname;
 
-    if (path === "/healthz") return json({ ok: true, version: env.VERSION ?? "dev" });
+    if (path === "/healthz")
+      return json({ ok: true, version: env.VERSION ?? "dev" });
 
     if (path.startsWith("/api/") || path.startsWith("/ws/")) {
       if (!env.SERVER_SECRET) return error("server_misconfigured", 500);
 
       if (path === "/api/info" && req.method === "GET") {
-        return json({ version: env.VERSION ?? "dev", turn: hasTurn(env), maxPeers: maxPeers(env) });
+        return json({
+          version: env.VERSION ?? "dev",
+          turn: hasTurn(env),
+          maxPeers: maxPeers(env),
+        });
       }
-      if (path === "/api/rooms" && req.method === "POST") return createRoom(req, env);
+      if (path === "/api/rooms" && req.method === "POST")
+        return createRoom(req, env);
       if (path === "/api/join" && req.method === "POST") return join(req, env);
 
       if (path.startsWith("/ws/")) {
@@ -142,7 +177,13 @@ export default {
         if (path === "/ws/discover") {
           const headers = new Headers(req.headers);
           const hidden = behindPrivacyRelay(req);
-          const keys = hidden ? [] : discoveryKeys(clientIP(req), url.searchParams.get("ip"), url.searchParams.get("ip6"));
+          const keys = hidden
+            ? []
+            : discoveryKeys(
+                clientIP(req),
+                url.searchParams.get("ip"),
+                url.searchParams.get("ip6"),
+              );
           headers.set("X-Discovery-Keys", JSON.stringify(keys));
           headers.set("X-Network-Hidden", hidden ? "1" : "0");
           return directory(env).fetch(new Request(req, { headers }));

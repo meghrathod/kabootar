@@ -5,13 +5,26 @@ import { hashFile } from "./hash";
 import { WakeLock } from "./platform";
 import { type SavedShare, dropShare, saveShare } from "./resume";
 import { type PublicAddresses, getPublicAddresses } from "./publicIp";
-import { CHANNEL_LABEL, CandidateQueue, type Route, type SignalData, detectRoute, hasTurn, isSignal } from "./rtc";
+import {
+  CHANNEL_LABEL,
+  CandidateQueue,
+  type Route,
+  type SignalData,
+  detectRoute,
+  hasTurn,
+  isSignal,
+} from "./rtc";
 import { SignalSocket, type SignalStatus } from "./signal";
 import { Store } from "./store";
 import { type ItemMeta, MAX_TEXT, chunkSizeFor } from "./transfer/protocol";
-import { ItemServer, type ServerEvent, type ShareItem } from "./transfer/server";
+import {
+  ItemServer,
+  type ServerEvent,
+  type ShareItem,
+} from "./transfer/server";
 
-export type PeerState = "connecting" | "connected" | "reconnecting" | "failed" | "left";
+export type PeerState =
+  "connecting" | "connected" | "reconnecting" | "failed" | "left";
 
 export interface PeerView {
   id: string;
@@ -83,7 +96,12 @@ class SenderLink {
     this.ice = new CandidateQueue(this.pc);
 
     this.pc.onicecandidate = (e) => {
-      if (e.candidate) this.sendSignal({ kind: "ice", candidate: e.candidate.toJSON(), link: this.linkId });
+      if (e.candidate)
+        this.sendSignal({
+          kind: "ice",
+          candidate: e.candidate.toJSON(),
+          link: this.linkId,
+        });
     };
     this.pc.onnegotiationneeded = () => void this.offer();
     this.pc.oniceconnectionstatechange = () => this.onIceState();
@@ -117,7 +135,11 @@ class SenderLink {
     if (this.closed || this.pc.signalingState !== "stable") return;
     try {
       await this.pc.setLocalDescription(await this.pc.createOffer());
-      this.sendSignal({ kind: "offer", sdp: this.pc.localDescription!.toJSON(), link: this.linkId });
+      this.sendSignal({
+        kind: "offer",
+        sdp: this.pc.localDescription!.toJSON(),
+        link: this.linkId,
+      });
     } catch (err) {
       console.warn("offer failed", err);
     }
@@ -128,7 +150,9 @@ class SenderLink {
     switch (data.kind) {
       case "answer":
         if (this.pc.signalingState !== "have-local-offer") return;
-        await this.pc.setRemoteDescription(data.sdp).catch((e) => console.warn(e));
+        await this.pc
+          .setRemoteDescription(data.sdp)
+          .catch((e) => console.warn(e));
         await this.ice.flush();
         break;
       case "ice":
@@ -141,7 +165,8 @@ class SenderLink {
     const s = this.pc.iceConnectionState;
     clearTimeout(this.disconnectTimer);
     if (s === "connected" || s === "completed") {
-      if (this.view.state === "reconnecting") this.update({ state: "connected" });
+      if (this.view.state === "reconnecting")
+        this.update({ state: "connected" });
     } else if (s === "disconnected") {
       // Often recovers by itself (e.g. a brief Wi-Fi hiccup); restart if not.
       this.disconnectTimer = setTimeout(() => this.restartIce(), 3000);
@@ -179,7 +204,8 @@ class SenderLink {
       const m = this.items.find((i) => i.meta.id === id)?.meta;
       return m?.kind === "file" ? m.size : 0;
     };
-    const doneBytes = (completed: number[]) => completed.reduce((n, id) => n + size(id), 0);
+    const doneBytes = (completed: number[]) =>
+      completed.reduce((n, id) => n + size(id), 0);
 
     switch (e.type) {
       case "request":
@@ -187,12 +213,24 @@ class SenderLink {
         break;
       case "progress": {
         const bytesDone = doneBytes(this.view.completed) + e.acked;
-        this.update({ current: { id: e.id, acked: e.acked }, bytesDone, speed: this.meter.sample(bytesDone) });
+        this.update({
+          current: { id: e.id, acked: e.acked },
+          bytesDone,
+          speed: this.meter.sample(bytesDone),
+        });
         break;
       }
       case "done": {
-        const completed = e.ok && !this.view.completed.includes(e.id) ? [...this.view.completed, e.id] : this.view.completed;
-        this.update({ completed, current: undefined, bytesDone: doneBytes(completed), speed: 0 });
+        const completed =
+          e.ok && !this.view.completed.includes(e.id)
+            ? [...this.view.completed, e.id]
+            : this.view.completed;
+        this.update({
+          completed,
+          current: undefined,
+          bytesDone: doneBytes(completed),
+          speed: 0,
+        });
         break;
       }
       case "failed":
@@ -210,7 +248,9 @@ class SenderLink {
   }
 
   get connected() {
-    return this.pc.connectionState === "connected" && this.dc.readyState === "open";
+    return (
+      this.pc.connectionState === "connected" && this.dc.readyState === "open"
+    );
   }
 
   close(state: PeerState = "left") {
@@ -244,11 +284,19 @@ export class SenderSession {
       {
         status: "live",
         signal: "connecting",
-        room: { id: created.id, name: created.name, emoji: created.emoji, color: created.color },
+        room: {
+          id: created.id,
+          name: created.name,
+          emoji: created.emoji,
+          color: created.color,
+        },
         pin: created.pin,
         link,
         items: items.map((i) => i.meta),
-        totalBytes: items.reduce((n, i) => n + (i.meta.kind === "file" ? i.meta.size : 0), 0),
+        totalBytes: items.reduce(
+          (n, i) => n + (i.meta.kind === "file" ? i.meta.size : 0),
+          0,
+        ),
         peers: [],
         relay: false,
         nearbyHidden: !!created.hidden,
@@ -270,8 +318,17 @@ export class SenderSession {
     }));
     this.signal.on("status", (signal) => this.store.set({ signal }, true));
     this.signal.on("welcome", (w) => {
-      this.iceServers = w.iceServers?.length ? w.iceServers : fallbackIceServers;
-      this.store.set({ room: w.room, pin: w.pin ?? this.store.get().pin, relay: hasTurn(this.iceServers) }, true);
+      this.iceServers = w.iceServers?.length
+        ? w.iceServers
+        : fallbackIceServers;
+      this.store.set(
+        {
+          room: w.room,
+          pin: w.pin ?? this.store.get().pin,
+          relay: hasTurn(this.iceServers),
+        },
+        true,
+      );
       for (const l of this.links.values()) l.setIceServers(this.iceServers);
       for (const p of w.peers ?? []) this.peerJoined(p);
     });
@@ -293,7 +350,11 @@ export class SenderSession {
       void this.links.get(from)?.handleSignal(data);
     });
     this.signal.on("error", (code, fatal) => {
-      if (fatal) this.store.set({ status: "error", error: errorMessage(new Error(code)) }, true);
+      if (fatal)
+        this.store.set(
+          { status: "error", error: errorMessage(new Error(code)) },
+          true,
+        );
     });
     this.signal.on("closed", () => this.finish("ended"));
 
@@ -302,13 +363,20 @@ export class SenderSession {
     saveShare({ created, discoverable, ip, items: items.map((i) => i.meta) });
   }
 
-  static async start(draft: Draft, discoverable = true): Promise<SenderSession> {
+  static async start(
+    draft: Draft,
+    discoverable = true,
+  ): Promise<SenderSession> {
     const items = toShareItems(draft);
     if (items.length === 0) throw new Error("Nothing to share");
     const ip = discoverable ? await getPublicAddresses() : undefined;
     const created = await createRoom(discoverable, ip);
     if (created.network) {
-      console.info("[kabootar] nearby network (sender):", created.network.join(", ") || "none", created.hidden ? "(hidden by a privacy relay)" : "");
+      console.info(
+        "[kabootar] nearby network (sender):",
+        created.network.join(", ") || "none",
+        created.hidden ? "(hidden by a privacy relay)" : "",
+      );
     }
     return new SenderSession(created, items, discoverable, ip);
   }
@@ -322,7 +390,12 @@ export class SenderSession {
       meta,
       file: meta.kind === "file" ? files.get(meta.id) : undefined,
     }));
-    return new SenderSession(saved.created, items, saved.discoverable, saved.ip);
+    return new SenderSession(
+      saved.created,
+      items,
+      saved.discoverable,
+      saved.ip,
+    );
   }
 
   get id() {
@@ -419,7 +492,10 @@ function toShareItems(draft: Draft): ShareItem[] {
   }
   for (const text of draft.texts) {
     const t = text.trim();
-    if (t) items.push({ meta: { id: id++, kind: "text", text: t.slice(0, MAX_TEXT) } });
+    if (t)
+      items.push({
+        meta: { id: id++, kind: "text", text: t.slice(0, MAX_TEXT) },
+      });
   }
   return items;
 }

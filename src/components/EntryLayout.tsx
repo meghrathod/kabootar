@@ -43,7 +43,9 @@ export function EntryLayout() {
               end
               className={({ isActive }) =>
                 `rounded-lg py-2 text-center font-mono text-xs font-medium tracking-[0.14em] uppercase transition ${
-                  isActive ? "bg-sky text-ink" : "text-white/55 hover:text-white"
+                  isActive
+                    ? "bg-sky text-ink"
+                    : "text-white/55 hover:text-white"
                 }`
               }
             >

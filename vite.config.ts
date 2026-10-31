@@ -25,7 +25,12 @@ export default defineConfig({
       injectRegister: false,
       manifestFilename: "manifest.webmanifest",
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,webmanifest}", "**/*-latin-wght-*.woff2", "assets/rounded/Icon-{192,512}.png", "assets/logo-mark.png"],
+        globPatterns: [
+          "**/*.{js,css,html,svg,webmanifest}",
+          "**/*-latin-wght-*.woff2",
+          "assets/rounded/Icon-{192,512}.png",
+          "assets/logo-mark.png",
+        ],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       devOptions: { enabled: true, type: "module" },
@@ -45,8 +50,18 @@ export default defineConfig({
         categories: ["productivity", "utilities"],
         icons: [
           ...[72, 96, 120, 128, 144, 152, 180, 192, 384, 512].map(icon),
-          { src: "/icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
-          { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          {
+            src: "/icons/maskable-192.png",
+            sizes: "192x192",
+            type: "image/png",
+            purpose: "maskable",
+          },
+          {
+            src: "/icons/maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
         shortcuts: [
           {

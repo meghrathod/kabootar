@@ -13,7 +13,10 @@ export class MemorySink implements Sink {
   }
 
   async close() {
-    const file = new File(this.parts, this.meta.name, { type: this.meta.type, lastModified: this.meta.lastModified });
+    const file = new File(this.parts, this.meta.name, {
+      type: this.meta.type,
+      lastModified: this.meta.lastModified,
+    });
     this.parts = [];
     return file;
   }

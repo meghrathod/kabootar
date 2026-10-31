@@ -9,7 +9,9 @@ export class PickerSink implements Sink {
   private constructor(private writable: FileSystemWritableFileStream) {}
 
   static async fromHandle(handle: FileSystemFileHandle): Promise<PickerSink> {
-    return new PickerSink(await handle.createWritable({ keepExistingData: false }));
+    return new PickerSink(
+      await handle.createWritable({ keepExistingData: false }),
+    );
   }
 
   async write(chunk: Uint8Array) {
@@ -32,7 +34,11 @@ export function pickSaveFile(meta: FileMeta): Promise<FileSystemFileHandle> {
 
 /** Must be called from a user gesture. */
 export function pickDirectory(): Promise<FileSystemDirectoryHandle> {
-  return window.showDirectoryPicker({ mode: "readwrite", id: "kabootar-downloads", startIn: "downloads" });
+  return window.showDirectoryPicker({
+    mode: "readwrite",
+    id: "kabootar-downloads",
+    startIn: "downloads",
+  });
 }
 
 async function exists(dir: FileSystemDirectoryHandle, name: string) {
@@ -45,16 +51,21 @@ async function exists(dir: FileSystemDirectoryHandle, name: string) {
 }
 
 /** Creates the file inside dir, recreating folder structure and avoiding overwrites. */
-export async function fileInDirectory(dir: FileSystemDirectoryHandle, meta: FileMeta): Promise<FileSystemFileHandle> {
+export async function fileInDirectory(
+  dir: FileSystemDirectoryHandle,
+  meta: FileMeta,
+): Promise<FileSystemFileHandle> {
   const parts = meta.path ? sanitizePath(meta.path) : [];
   const name = parts.pop() ?? sanitizeName(meta.name);
   let target = dir;
-  for (const p of parts) target = await target.getDirectoryHandle(p, { create: true });
+  for (const p of parts)
+    target = await target.getDirectoryHandle(p, { create: true });
 
   const dot = name.lastIndexOf(".");
   const base = dot > 0 ? name.slice(0, dot) : name;
   const ext = dot > 0 ? name.slice(dot) : "";
   let candidate = name;
-  for (let i = 1; await exists(target, candidate); i++) candidate = `${base} (${i})${ext}`;
+  for (let i = 1; await exists(target, candidate); i++)
+    candidate = `${base} (${i})${ext}`;
   return target.getFileHandle(candidate, { create: true });
 }

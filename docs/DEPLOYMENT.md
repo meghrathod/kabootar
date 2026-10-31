@@ -51,10 +51,10 @@ and run `yarn deploy` again.
 
 Add two repository secrets (**Settings → Secrets and variables → Actions**):
 
-| Secret | Where to get it |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | Dashboard → My Profile → API Tokens → Create Token → **Edit Cloudflare Workers** template |
-| `CLOUDFLARE_ACCOUNT_ID` | Dashboard → Workers & Pages → Account ID (right sidebar) |
+| Secret                  | Where to get it                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`  | Dashboard → My Profile → API Tokens → Create Token → **Edit Cloudflare Workers** template |
+| `CLOUDFLARE_ACCOUNT_ID` | Dashboard → Workers & Pages → Account ID (right sidebar)                                  |
 
 Worker secrets (`SERVER_SECRET`, TURN keys) are stored in Cloudflare, not GitHub; set them once as above. Until the GitHub secrets exist the deploy job is skipped with a notice.
 
@@ -62,21 +62,21 @@ Worker secrets (`SERVER_SECRET`, TURN keys) are stored in Cloudflare, not GitHub
 
 Plain variables live in `wrangler.jsonc` under `vars`:
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `MAX_PEERS` | `8` | Receivers per share |
-| `ROOM_TTL_HOURS` | `24` | Maximum lifetime of a share |
-| `MASTER_GRACE_SECONDS` | `300` | How long a share waits for the sender to come back (reload, network change) |
-| `STUN_URLS` | Cloudflare + Google | Comma-separated STUN servers |
-| `ALLOWED_ORIGINS` | — | Extra origins allowed to open websockets (same-origin is always allowed) |
+| Variable               | Default             | Meaning                                                                     |
+| ---------------------- | ------------------- | --------------------------------------------------------------------------- |
+| `MAX_PEERS`            | `8`                 | Receivers per share                                                         |
+| `ROOM_TTL_HOURS`       | `24`                | Maximum lifetime of a share                                                 |
+| `MASTER_GRACE_SECONDS` | `300`               | How long a share waits for the sender to come back (reload, network change) |
+| `STUN_URLS`            | Cloudflare + Google | Comma-separated STUN servers                                                |
+| `ALLOWED_ORIGINS`      | —                   | Extra origins allowed to open websockets (same-origin is always allowed)    |
 
 Secrets:
 
-| Secret | Required | Meaning |
-|---|---|---|
-| `SERVER_SECRET` | yes | Derives room keys |
-| `CF_TURN_KEY_ID` | no | Cloudflare Realtime TURN key id |
-| `CF_TURN_API_TOKEN` | no | Cloudflare Realtime TURN API token |
+| Secret              | Required | Meaning                            |
+| ------------------- | -------- | ---------------------------------- |
+| `SERVER_SECRET`     | yes      | Derives room keys                  |
+| `CF_TURN_KEY_ID`    | no       | Cloudflare Realtime TURN key id    |
+| `CF_TURN_API_TOKEN` | no       | Cloudflare Realtime TURN API token |
 
 ## Free-plan headroom
 

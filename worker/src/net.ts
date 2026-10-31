@@ -16,7 +16,8 @@ export function behindPrivacyRelay(req: Request): boolean {
 
 /** Expand an IPv6 address to 8 hextets, or undefined if invalid. */
 function ipv6Hextets(ip: string): number[] | undefined {
-  if (!/^[0-9a-fA-F:.]+$/.test(ip) || ip.split("::").length > 2) return undefined;
+  if (!/^[0-9a-fA-F:.]+$/.test(ip) || ip.split("::").length > 2)
+    return undefined;
   const [head, tail] = ip.includes("::") ? ip.split("::") : [ip, undefined];
   const parse = (part: string) => (part ? part.split(":") : []);
   const h = parse(head);
@@ -25,19 +26,33 @@ function ipv6Hextets(ip: string): number[] | undefined {
   if ([...h, ...t].some((x) => x.includes("."))) return undefined;
   const missing = 8 - h.length - t.length;
   if (missing < 0 || (tail === undefined && missing !== 0)) return undefined;
-  const all = [...h, ...Array(missing).fill("0"), ...t].map((x) => parseInt(x, 16));
-  return all.length === 8 && all.every((n) => n >= 0 && n <= 0xffff) ? all : undefined;
+  const all = [...h, ...Array(missing).fill("0"), ...t].map((x) =>
+    parseInt(x, 16),
+  );
+  return all.length === 8 && all.every((n) => n >= 0 && n <= 0xffff)
+    ? all
+    : undefined;
 }
 
 function ipv4(ip: string): number[] | undefined {
-  const m = ip.match(/^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/i);
+  const m = ip.match(
+    /^(?:::ffff:)?(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/i,
+  );
   if (!m) return undefined;
   const parts = m.slice(1).map(Number);
   return parts.every((n) => n <= 255) ? parts : undefined;
 }
 
 function isPrivateV4([a, b]: number[]) {
-  return a === 10 || a === 127 || a === 0 || (a === 172 && b >= 16 && b < 32) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b < 128);
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 172 && b >= 16 && b < 32) ||
+    (a === 192 && b === 168) ||
+    (a === 169 && b === 254) ||
+    (a === 100 && b >= 64 && b < 128)
+  );
 }
 
 /**
@@ -49,7 +64,11 @@ export function networkKey(ip: string | null | undefined): string | undefined {
   const v4 = ipv4(ip.trim());
   if (v4) return v4.join(".");
   const v6 = ipv6Hextets(ip.trim());
-  if (v6) return `${v6.slice(0, 4).map((n) => n.toString(16)).join(":")}::/64`;
+  if (v6)
+    return `${v6
+      .slice(0, 4)
+      .map((n) => n.toString(16))
+      .join(":")}::/64`;
   return undefined;
 }
 
@@ -59,7 +78,11 @@ export function networkKey(ip: string | null | undefined): string | undefined {
  * one reaches us over IPv6 and the other over IPv4, or through iCloud
  * Private Relay).
  */
-export function discoveryKeys(observed: string | null, reported: unknown, reported6?: unknown): string[] {
+export function discoveryKeys(
+  observed: string | null,
+  reported: unknown,
+  reported6?: unknown,
+): string[] {
   const keys: string[] = [];
   const add = (k: string | undefined) => k && !keys.includes(k) && keys.push(k);
   add(networkKey(observed));
@@ -67,6 +90,7 @@ export function discoveryKeys(observed: string | null, reported: unknown, report
     const v4 = ipv4(reported.trim());
     if (v4 && !isPrivateV4(v4)) add(v4.join("."));
   }
-  if (typeof reported6 === "string" && /^[23]/.test(reported6.trim())) add(networkKey(reported6));
+  if (typeof reported6 === "string" && /^[23]/.test(reported6.trim()))
+    add(networkKey(reported6));
   return keys.slice(0, 4);
 }

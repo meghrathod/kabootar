@@ -11,7 +11,13 @@ const keyCache = new Map<string, Promise<CryptoKey>>();
 function hmacKey(secret: string) {
   let k = keyCache.get(secret);
   if (!k) {
-    k = crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    k = crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
     keyCache.set(secret, k);
   }
   return k;
@@ -25,12 +31,25 @@ function base64url(buf: ArrayBuffer) {
 
 export type Role = "m" | "c";
 
-export async function deriveKey(secret: string, role: Role, id: string): Promise<string> {
-  const sig = await crypto.subtle.sign("HMAC", await hmacKey(secret), enc.encode(`${role}|${id}`));
+export async function deriveKey(
+  secret: string,
+  role: Role,
+  id: string,
+): Promise<string> {
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    await hmacKey(secret),
+    enc.encode(`${role}|${id}`),
+  );
   return base64url(sig).slice(0, 32);
 }
 
-export async function checkKey(secret: string, role: Role, id: string, key: unknown): Promise<boolean> {
+export async function checkKey(
+  secret: string,
+  role: Role,
+  id: string,
+  key: unknown,
+): Promise<boolean> {
   if (typeof key !== "string" || key.length !== 32) return false;
   const expected = enc.encode(await deriveKey(secret, role, id));
   const given = enc.encode(key);
@@ -46,7 +65,8 @@ export function randomID(n: number): string {
     crypto.getRandomValues(buf);
     for (const b of buf) {
       // Rejection sampling keeps the distribution uniform.
-      if (b < 256 - (256 % ID_ALPHABET.length) && out.length < n) out.push(ID_ALPHABET[b % ID_ALPHABET.length]);
+      if (b < 256 - (256 % ID_ALPHABET.length) && out.length < n)
+        out.push(ID_ALPHABET[b % ID_ALPHABET.length]);
     }
   }
   return out.join("");
@@ -60,5 +80,7 @@ export function randomPIN(): string {
   }
 }
 
-export const validID = (id: unknown): id is string => typeof id === "string" && /^[A-Za-z0-9]{12}$/.test(id);
-export const validPIN = (pin: unknown): pin is string => typeof pin === "string" && /^[1-9]\d{5}$/.test(pin);
+export const validID = (id: unknown): id is string =>
+  typeof id === "string" && /^[A-Za-z0-9]{12}$/.test(id);
+export const validPIN = (pin: unknown): pin is string =>
+  typeof pin === "string" && /^[1-9]\d{5}$/.test(pin);

@@ -12,7 +12,10 @@ interface Created {
   pin: string;
 }
 
-async function createRoom(ip = "203.0.113.10", discoverable = true): Promise<Created> {
+async function createRoom(
+  ip = "203.0.113.10",
+  discoverable = true,
+): Promise<Created> {
   const res = await SELF.fetch(`${BASE}/api/rooms`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "CF-Connecting-IP": ip },
@@ -24,7 +27,9 @@ async function createRoom(ip = "203.0.113.10", discoverable = true): Promise<Cre
 
 /** A websocket client that queues incoming messages. */
 async function connect(path: string, ip = "203.0.113.10") {
-  const res = await SELF.fetch(`${BASE}${path}`, { headers: { Upgrade: "websocket", "CF-Connecting-IP": ip } });
+  const res = await SELF.fetch(`${BASE}${path}`, {
+    headers: { Upgrade: "websocket", "CF-Connecting-IP": ip },
+  });
   expect(res.status).toBe(101);
   const ws = res.webSocket!;
   ws.accept();
@@ -40,7 +45,10 @@ async function connect(path: string, ip = "203.0.113.10") {
     new Promise<Record<string, unknown>>((resolve, reject) => {
       const q = queue.shift();
       if (q) return resolve(q);
-      const timer = setTimeout(() => reject(new Error("timed out waiting for message")), 3000);
+      const timer = setTimeout(
+        () => reject(new Error("timed out waiting for message")),
+        3000,
+      );
       waiters.push((m) => {
         clearTimeout(timer);
         resolve(m);
@@ -48,7 +56,8 @@ async function connect(path: string, ip = "203.0.113.10") {
     });
   return {
     ws,
-    send: (m: unknown) => ws.send(typeof m === "string" ? m : JSON.stringify(m)),
+    send: (m: unknown) =>
+      ws.send(typeof m === "string" ? m : JSON.stringify(m)),
     next,
     async expect(t: string) {
       const m = await next();
@@ -76,7 +85,10 @@ describe("signalling", () => {
       body: JSON.stringify({ pin: room.pin }),
     });
     expect(joined.status).toBe(200);
-    const { clientKey, room: info } = (await joined.json()) as { clientKey: string; room: { id: string } };
+    const { clientKey, room: info } = (await joined.json()) as {
+      clientKey: string;
+      room: { id: string };
+    };
     expect(clientKey).toBe(room.clientKey);
     expect(info.id).toBe(room.id);
 
@@ -115,7 +127,9 @@ describe("signalling", () => {
     unknown.send({ t: "auth", role: "peer", key: room.clientKey });
     expect((await unknown.expect("error")).code).toBe("invalid_key");
 
-    const bad = await SELF.fetch(`${BASE}/ws/room/not-a-room!`, { headers: { Upgrade: "websocket" } });
+    const bad = await SELF.fetch(`${BASE}/ws/room/not-a-room!`, {
+      headers: { Upgrade: "websocket" },
+    });
     expect(bad.status).toBe(404);
   });
 
@@ -156,7 +170,12 @@ describe("signalling", () => {
 
     // Same receiver comes back (the old socket may still look open).
     const again = await connect(`/ws/room/${room.id}`);
-    again.send({ t: "auth", role: "peer", key: room.clientKey, resume: peerId });
+    again.send({
+      t: "auth",
+      role: "peer",
+      key: room.clientKey,
+      resume: peerId,
+    });
     expect((await again.expect("welcome")).peerId).toBe(peerId);
     expect((await master.expect("join")).peer).toBe(peerId);
 
@@ -165,7 +184,10 @@ describe("signalling", () => {
     expect((await again.expect("signal")).data).toEqual({ kind: "offer" });
     master.send({ t: "ping-check" });
     await new Promise((r) => setTimeout(r, 200));
-    const extra = await Promise.race([master.next(), new Promise((r) => setTimeout(() => r(null), 300))]);
+    const extra = await Promise.race([
+      master.next(),
+      new Promise((r) => setTimeout(() => r(null), 300)),
+    ]);
     expect(extra).toBeNull();
   });
 
@@ -184,7 +206,12 @@ describe("signalling", () => {
       t: "auth",
       role: "master",
       key: room.masterKey,
-      restore: { name: room.name, emoji: room.emoji, pin: room.pin, discoverable: false },
+      restore: {
+        name: room.name,
+        emoji: room.emoji,
+        pin: room.pin,
+        discoverable: false,
+      },
     });
     const w = await m2.expect("welcome");
     expect(w.pin).toBe(room.pin);
@@ -222,7 +249,9 @@ describe("discovery", () => {
     // A late watcher gets existing rooms; other networks see nothing.
     const late = await connect(`/ws/discover`, "192.0.2.50");
     await late.expect("network");
-    expect(((await late.expect("add")).room as { id: string }).id).toBe(room.id);
+    expect(((await late.expect("add")).room as { id: string }).id).toBe(
+      room.id,
+    );
 
     const master = await connect(`/ws/room/${room.id}`, "192.0.2.50");
     master.send({ t: "auth", role: "master", key: room.masterKey });
@@ -232,8 +261,14 @@ describe("discovery", () => {
   });
 
   it("matches IPv6 clients by /64 and via a reported public IPv4", async () => {
-    const v6 = await connect(`/ws/discover?ip=192.0.2.77`, "2001:db8:1:2::abcd");
-    expect((await v6.expect("network")).keys).toEqual(["2001:db8:1:2::/64", "192.0.2.77"]);
+    const v6 = await connect(
+      `/ws/discover?ip=192.0.2.77`,
+      "2001:db8:1:2::abcd",
+    );
+    expect((await v6.expect("network")).keys).toEqual([
+      "2001:db8:1:2::/64",
+      "192.0.2.77",
+    ]);
     const room = await createRoom("192.0.2.77");
     expect(((await v6.expect("add")).room as { id: string }).id).toBe(room.id);
   });
@@ -241,7 +276,10 @@ describe("discovery", () => {
   it("matches a Private Relay client through its STUN-reported IPv6 prefix", async () => {
     // The watcher's web traffic comes from a relay address; STUN still sees
     // the home network's IPv6 prefix, which the sender shares.
-    const watcher = await connect(`/ws/discover?ip6=2600:4040:aa:bb::1234`, "104.28.1.1");
+    const watcher = await connect(
+      `/ws/discover?ip6=2600:4040:aa:bb::1234`,
+      "104.28.1.1",
+    );
     await watcher.expect("network");
     const res = await SELF.fetch(`${BASE}/api/rooms`, {
       method: "POST",
@@ -250,7 +288,9 @@ describe("discovery", () => {
     });
     const room = (await res.json()) as { id: string; network: string[] };
     expect(room.network).toEqual(["2600:4040:aa:bb::/64"]);
-    expect(((await watcher.expect("add")).room as { id: string }).id).toBe(room.id);
+    expect(((await watcher.expect("add")).room as { id: string }).id).toBe(
+      room.id,
+    );
   });
 });
 
@@ -264,7 +304,9 @@ describe("privacy relays", () => {
     const ws = res.webSocket!;
     ws.accept();
     const first = await new Promise<Record<string, unknown>>((r) =>
-      ws.addEventListener("message", (e) => r(JSON.parse(e.data as string)), { once: true }),
+      ws.addEventListener("message", (e) => r(JSON.parse(e.data as string)), {
+        once: true,
+      }),
     );
     expect(first).toEqual({ t: "network", keys: [], hidden: true });
 
@@ -294,7 +336,10 @@ describe("api", () => {
 
   it("answers health and info, rejects cross-origin websockets", async () => {
     expect((await SELF.fetch(`${BASE}/healthz`)).status).toBe(200);
-    const info = (await (await SELF.fetch(`${BASE}/api/info`)).json()) as { turn: boolean; maxPeers: number };
+    const info = (await (await SELF.fetch(`${BASE}/api/info`)).json()) as {
+      turn: boolean;
+      maxPeers: number;
+    };
     expect(info).toMatchObject({ turn: false, maxPeers: 8 });
     const res = await SELF.fetch(`${BASE}/ws/discover`, {
       headers: { Upgrade: "websocket", Origin: "https://evil.example" },

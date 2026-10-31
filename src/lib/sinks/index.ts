@@ -1,8 +1,20 @@
-import { canShareFiles, hasDirectoryPicker, hasOPFS, hasSavePicker, isIOS, isSafari } from "../platform";
+import {
+  canShareFiles,
+  hasDirectoryPicker,
+  hasOPFS,
+  hasSavePicker,
+  isIOS,
+  isSafari,
+} from "../platform";
 import type { FileMeta } from "../transfer/protocol";
 import { MemorySink } from "./memory";
 import { OPFSSink } from "./opfs";
-import { PickerSink, fileInDirectory, pickDirectory, pickSaveFile } from "./picker";
+import {
+  PickerSink,
+  fileInDirectory,
+  pickDirectory,
+  pickSaveFile,
+} from "./picker";
 import { StreamSink } from "./stream";
 import type { Sink } from "./types";
 
@@ -22,7 +34,8 @@ export type Strategy = "picker" | "stream" | "opfs" | "memory";
 export function bestStrategy(): Strategy {
   if (hasSavePicker) return "picker";
   if (StreamSink.available()) return "stream";
-  if (hasOPFS && (isSafari || isIOS || !navigator.serviceWorker?.controller)) return "opfs";
+  if (hasOPFS && (isSafari || isIOS || !navigator.serviceWorker?.controller))
+    return "opfs";
   return "memory";
 }
 
@@ -35,9 +48,14 @@ export interface SinkTarget {
   dir?: FileSystemDirectoryHandle;
 }
 
-export async function openSink(meta: FileMeta, target: SinkTarget): Promise<Sink> {
+export async function openSink(
+  meta: FileMeta,
+  target: SinkTarget,
+): Promise<Sink> {
   const sink = await chooseSink(meta, target);
-  console.info(`[kabootar] saving "${meta.name}" (${meta.size} bytes) via ${sink.kind} (wanted ${target.strategy})`);
+  console.info(
+    `[kabootar] saving "${meta.name}" (${meta.size} bytes) via ${sink.kind} (wanted ${target.strategy})`,
+  );
   return sink;
 }
 
@@ -45,13 +63,17 @@ async function chooseSink(meta: FileMeta, target: SinkTarget): Promise<Sink> {
   switch (target.strategy) {
     case "picker":
       if (target.file) return PickerSink.fromHandle(target.file);
-      if (target.dir) return PickerSink.fromHandle(await fileInDirectory(target.dir, meta));
+      if (target.dir)
+        return PickerSink.fromHandle(await fileInDirectory(target.dir, meta));
       break;
     case "stream":
       try {
         return await StreamSink.open(meta);
       } catch (err) {
-        console.warn("[kabootar] streamed download unavailable, falling back:", err);
+        console.warn(
+          "[kabootar] streamed download unavailable, falling back:",
+          err,
+        );
       }
       break;
     case "opfs":
@@ -63,7 +85,10 @@ async function chooseSink(meta: FileMeta, target: SinkTarget): Promise<Sink> {
     try {
       return await OPFSSink.open(meta);
     } catch (err) {
-      console.warn("[kabootar] device storage unavailable, falling back to memory:", err);
+      console.warn(
+        "[kabootar] device storage unavailable, falling back to memory:",
+        err,
+      );
       if (err instanceof Error && /storage space/.test(err.message)) throw err;
     }
   }

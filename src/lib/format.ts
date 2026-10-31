@@ -2,7 +2,10 @@ const units = ["B", "KB", "MB", "GB", "TB"];
 
 export function formatBytes(bytes: number, digits = 1): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
-  const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  const i = Math.min(
+    units.length - 1,
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+  );
   const v = bytes / 1024 ** i;
   return `${v.toFixed(i === 0 || v >= 100 ? 0 : digits)} ${units[i]}`;
 }
@@ -42,7 +45,10 @@ export class SpeedMeter {
     const dt = (now - this.lastTime) / 1000;
     if (dt >= 0.25) {
       const instant = Math.max(0, bytes - this.lastBytes) / dt;
-      this.speed = this.speed === 0 ? instant : this.alpha * instant + (1 - this.alpha) * this.speed;
+      this.speed =
+        this.speed === 0
+          ? instant
+          : this.alpha * instant + (1 - this.alpha) * this.speed;
       this.lastBytes = bytes;
       this.lastTime = now;
     }

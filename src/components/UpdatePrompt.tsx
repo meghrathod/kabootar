@@ -20,11 +20,13 @@ export function UpdatePrompt() {
             setTimeout(() => location.reload(), 300);
           },
         });
-      if (reg.waiting && navigator.serviceWorker.controller) prompt(reg.waiting);
+      if (reg.waiting && navigator.serviceWorker.controller)
+        prompt(reg.waiting);
       reg.addEventListener("updatefound", () => {
         const w = reg.installing;
         w?.addEventListener("statechange", () => {
-          if (w.state === "installed" && navigator.serviceWorker.controller) prompt(w);
+          if (w.state === "installed" && navigator.serviceWorker.controller)
+            prompt(w);
         });
       });
     });

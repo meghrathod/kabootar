@@ -31,5 +31,7 @@ declare global {
 }
 
 export const maxPeers = (env: Env) => Number(env.MAX_PEERS ?? 8);
-export const roomTTL = (env: Env) => Number(env.ROOM_TTL_HOURS ?? 24) * 3_600_000;
-export const masterGrace = (env: Env) => Number(env.MASTER_GRACE_SECONDS ?? 300) * 1000;
+export const roomTTL = (env: Env) =>
+  Number(env.ROOM_TTL_HOURS ?? 24) * 3_600_000;
+export const masterGrace = (env: Env) =>
+  Number(env.MASTER_GRACE_SECONDS ?? 300) * 1000;

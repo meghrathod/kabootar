@@ -17,7 +17,11 @@ export type Route = "lan" | "direct" | "relay";
 export const CHANNEL_LABEL = "kabootar";
 
 export function isSignal(v: unknown): v is SignalData {
-  return !!v && typeof v === "object" && typeof (v as { kind?: unknown }).kind === "string";
+  return (
+    !!v &&
+    typeof v === "object" &&
+    typeof (v as { kind?: unknown }).kind === "string"
+  );
 }
 
 export function hasTurn(servers: RTCIceServer[]): boolean {
@@ -45,26 +49,42 @@ export class CandidateQueue {
 }
 
 /** Which path the connection ended up using. */
-export async function detectRoute(pc: RTCPeerConnection): Promise<Route | undefined> {
+export async function detectRoute(
+  pc: RTCPeerConnection,
+): Promise<Route | undefined> {
   try {
     const stats = await pc.getStats();
     let pair: RTCIceCandidatePairStats | undefined;
     stats.forEach((s) => {
-      if (s.type === "transport" && (s as RTCTransportStats).selectedCandidatePairId) {
-        pair = stats.get((s as RTCTransportStats).selectedCandidatePairId!) as RTCIceCandidatePairStats;
+      if (
+        s.type === "transport" &&
+        (s as RTCTransportStats).selectedCandidatePairId
+      ) {
+        pair = stats.get(
+          (s as RTCTransportStats).selectedCandidatePairId!,
+        ) as RTCIceCandidatePairStats;
       }
     });
     if (!pair) {
       stats.forEach((s) => {
         const p = s as RTCIceCandidatePairStats & { selected?: boolean };
-        if (s.type === "candidate-pair" && p.state === "succeeded" && (p.nominated || p.selected)) pair ??= p;
+        if (
+          s.type === "candidate-pair" &&
+          p.state === "succeeded" &&
+          (p.nominated || p.selected)
+        )
+          pair ??= p;
       });
     }
     if (!pair) return undefined;
-    const local = stats.get(pair.localCandidateId) as { candidateType?: string } | undefined;
-    const remote = stats.get(pair.remoteCandidateId) as { candidateType?: string } | undefined;
-    if (local?.candidateType === "relay" || remote?.candidateType === "relay") return "relay";
-    if (local?.candidateType === "host" && remote?.candidateType === "host") return "lan";
+    const local = stats.get(pair.localCandidateId) as
+      { candidateType?: string } | undefined;
+    const remote = stats.get(pair.remoteCandidateId) as
+      { candidateType?: string } | undefined;
+    if (local?.candidateType === "relay" || remote?.candidateType === "relay")
+      return "relay";
+    if (local?.candidateType === "host" && remote?.candidateType === "host")
+      return "lan";
     return "direct";
   } catch {
     return undefined;
@@ -73,7 +93,8 @@ export async function detectRoute(pc: RTCPeerConnection): Promise<Route | undefi
 
 export const routeHelp: Record<Route, string> = {
   lan: "Both devices are on the same network, so the file goes straight between them without leaving your local network. This is the fastest path.",
-  direct: "The devices are on different networks but found a direct path across the internet, so the file still goes device to device.",
+  direct:
+    "The devices are on different networks but found a direct path across the internet, so the file still goes device to device.",
   relay:
     "A direct path was blocked (common on cellular networks and strict Wi-Fi), so the encrypted data passes through Cloudflare's relay. The relay can't read your files; transfers may be slower.",
 };

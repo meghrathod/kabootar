@@ -12,7 +12,8 @@ export interface Welcome {
   online?: boolean;
 }
 
-export type SignalStatus = "connecting" | "open" | "reconnecting" | "failed" | "closed";
+export type SignalStatus =
+  "connecting" | "open" | "reconnecting" | "failed" | "closed";
 
 type Events = {
   status: [SignalStatus];
@@ -30,7 +31,14 @@ export interface Auth {
   key: string;
   /** Receiver id from a previous connection, to keep the same identity. */
   resume?: string;
-  restore?: { name: string; emoji: string; pin: string; discoverable: boolean; ip?: string; ip6?: string };
+  restore?: {
+    name: string;
+    emoji: string;
+    pin: string;
+    discoverable: boolean;
+    ip?: string;
+    ip6?: string;
+  };
 }
 
 const FATAL = new Set(["invalid_key", "room_full", "bad_request"]);
@@ -66,7 +74,8 @@ export class SignalSocket extends Emitter<Events> {
   }
 
   send(msg: Record<string, unknown>): boolean {
-    if (this.ws?.readyState !== WebSocket.OPEN || this.status !== "open") return false;
+    if (this.ws?.readyState !== WebSocket.OPEN || this.status !== "open")
+      return false;
     this.ws.send(JSON.stringify(msg));
     return true;
   }
@@ -93,7 +102,9 @@ export class SignalSocket extends Emitter<Events> {
   private connect() {
     if (this.stopped) return;
     this.cleanup();
-    const ws = new WebSocket(`${wsBase}/ws/room/${encodeURIComponent(this.roomId)}`);
+    const ws = new WebSocket(
+      `${wsBase}/ws/room/${encodeURIComponent(this.roomId)}`,
+    );
     this.ws = ws;
     this.lastSeen = Date.now();
 
@@ -171,7 +182,8 @@ export class SignalSocket extends Emitter<Events> {
     if (this.stopped) return;
     this.cleanup();
     this.setStatus("reconnecting");
-    const delay = Math.min(10_000, 500 * 2 ** this.attempt) * (0.75 + Math.random() * 0.5);
+    const delay =
+      Math.min(10_000, 500 * 2 ** this.attempt) * (0.75 + Math.random() * 0.5);
     this.attempt = Math.min(this.attempt + 1, 6);
     this.retryTimer = setTimeout(() => this.connect(), delay);
   }
@@ -184,7 +196,8 @@ export class SignalSocket extends Emitter<Events> {
 
   private onVisible = () => {
     if (document.visibilityState !== "visible" || this.stopped) return;
-    if (this.status !== "open" || Date.now() - this.lastSeen > HEARTBEAT_MS * 2) this.reconnectNow();
+    if (this.status !== "open" || Date.now() - this.lastSeen > HEARTBEAT_MS * 2)
+      this.reconnectNow();
   };
 
   private cleanup() {
@@ -194,7 +207,11 @@ export class SignalSocket extends Emitter<Events> {
     this.ws = undefined;
     if (ws) {
       ws.onopen = ws.onmessage = ws.onclose = null;
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) ws.close();
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      )
+        ws.close();
     }
   }
 }
@@ -208,10 +225,15 @@ export function endShare(roomId: string, masterKey: string): Promise<void> {
       resolve();
     };
     const timer = setTimeout(() => (ws.close(), done()), 5000);
-    ws.onopen = () => ws.send(JSON.stringify({ t: "auth", role: "master", key: masterKey }));
+    ws.onopen = () =>
+      ws.send(JSON.stringify({ t: "auth", role: "master", key: masterKey }));
     ws.onmessage = (e) => {
       if (String(e.data).includes('"welcome"')) ws.send('{"t":"close"}');
-      else if (String(e.data).includes('"closed"') || String(e.data).includes('"error"')) ws.close();
+      else if (
+        String(e.data).includes('"closed"') ||
+        String(e.data).includes('"error"')
+      )
+        ws.close();
     };
     ws.onclose = done;
   });

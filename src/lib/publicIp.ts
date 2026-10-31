@@ -7,7 +7,14 @@ export interface PublicAddresses {
 
 function isPrivateV4(ip: string) {
   const [a, b] = ip.split(".").map(Number);
-  return a === 10 || a === 127 || (a === 172 && b >= 16 && b < 32) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b < 128) || a === 0;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 172 && b >= 16 && b < 32) ||
+    (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b < 128) ||
+    a === 0
+  );
 }
 
 const isPublicV6 = (ip: string) => /^[23][0-9a-f]{3}:/i.test(ip);
@@ -41,8 +48,10 @@ export function getPublicAddresses(timeoutMs = 3500): Promise<PublicAddresses> {
     pc.onicecandidate = (e) => {
       if (!e.candidate) return finish();
       if (e.candidate.type !== "srflx") return;
-      const addr = e.candidate.address ?? e.candidate.candidate.split(" ")[4] ?? "";
-      if (/^\d+\.\d+\.\d+\.\d+$/.test(addr) && !isPrivateV4(addr)) found.v4 ??= addr;
+      const addr =
+        e.candidate.address ?? e.candidate.candidate.split(" ")[4] ?? "";
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(addr) && !isPrivateV4(addr))
+        found.v4 ??= addr;
       else if (addr.includes(":") && isPublicV6(addr)) found.v6 ??= addr;
       if (found.v4 && found.v6) finish();
     };

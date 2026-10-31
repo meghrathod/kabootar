@@ -18,7 +18,10 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/receive" element={<Receive />} />
             </Route>
-            <Route path="/discover" element={<Navigate to="/receive" replace />} />
+            <Route
+              path="/discover"
+              element={<Navigate to="/receive" replace />}
+            />
             <Route path="/:id" element={<Room />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

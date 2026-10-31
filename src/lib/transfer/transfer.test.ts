@@ -3,7 +3,14 @@ import { createSHA256 } from "hash-wasm";
 
 import type { Sink } from "../sinks/types";
 import { ItemClient, type ItemState } from "./client";
-import { type Channel, type ItemMeta, MiB, sanitizePath, sanitizeName, validItems } from "./protocol";
+import {
+  type Channel,
+  type ItemMeta,
+  MiB,
+  sanitizePath,
+  sanitizeName,
+  validItems,
+} from "./protocol";
 import { ItemServer, type ShareItem } from "./server";
 
 /** In-memory data channel pair with an asynchronous, buffered link. */
@@ -41,20 +48,28 @@ class FakeChannel implements Channel {
     let payload: string | ArrayBuffer;
     if (typeof data === "string") payload = data;
     else if (data instanceof ArrayBuffer) payload = data.slice(0);
-    else payload = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    else
+      payload = data.buffer.slice(
+        data.byteOffset,
+        data.byteOffset + data.byteLength,
+      );
 
     if (typeof payload !== "string" && this.corruptAt !== undefined) {
       const at = this.corruptAt - this.delivered;
-      if (at >= 0 && at < payload.byteLength) new Uint8Array(payload)[at] ^= 0xff;
+      if (at >= 0 && at < payload.byteLength)
+        new Uint8Array(payload)[at] ^= 0xff;
       this.delivered += payload.byteLength;
     }
 
-    const size = typeof payload === "string" ? payload.length : payload.byteLength;
+    const size =
+      typeof payload === "string" ? payload.length : payload.byteLength;
     this.bufferedAmount += size;
     setTimeout(() => {
       this.bufferedAmount -= size;
-      if (this.readyState === "open") this.peer.fire("message", { data: payload } as MessageEvent);
-      if (this.bufferedAmount <= this.bufferedAmountLowThreshold) this.fire("bufferedamountlow");
+      if (this.readyState === "open")
+        this.peer.fire("message", { data: payload } as MessageEvent);
+      if (this.bufferedAmount <= this.bufferedAmountLowThreshold)
+        this.fire("bufferedamountlow");
     }, 0);
   }
 
@@ -84,7 +99,9 @@ class MemorySink implements Sink {
     this.aborted = true;
   }
   bytes() {
-    const out = new Uint8Array(this.parts.reduce((n, p) => n + p.byteLength, 0));
+    const out = new Uint8Array(
+      this.parts.reduce((n, p) => n + p.byteLength, 0),
+    );
     let o = 0;
     for (const p of this.parts) {
       out.set(p, o);
@@ -96,7 +113,8 @@ class MemorySink implements Sink {
 
 function randomFile(size: number, name = "f.bin"): File {
   const data = new Uint8Array(size);
-  for (let i = 0; i < size; i += 65536) crypto.getRandomValues(data.subarray(i, Math.min(size, i + 65536)));
+  for (let i = 0; i < size; i += 65536)
+    crypto.getRandomValues(data.subarray(i, Math.min(size, i + 65536)));
   return new File([data], name, { type: "application/octet-stream" });
 }
 
@@ -111,9 +129,18 @@ function share(files: File[], texts: string[] = []): ShareItem[] {
   return [
     ...files.map((file) => ({
       file,
-      meta: { id: id++, kind: "file", name: file.name, size: file.size, type: file.type, lastModified: 0 } as ItemMeta,
+      meta: {
+        id: id++,
+        kind: "file",
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: 0,
+      } as ItemMeta,
     })),
-    ...texts.map((text) => ({ meta: { id: id++, kind: "text", text } as ItemMeta })),
+    ...texts.map((text) => ({
+      meta: { id: id++, kind: "text", text } as ItemMeta,
+    })),
   ];
 }
 
@@ -129,7 +156,11 @@ function waitFor(pred: () => boolean, timeout = 10_000) {
   });
 }
 
-function connect(items: ShareItem[], client: ItemClient, chunkSize = 64 * 1024) {
+function connect(
+  items: ShareItem[],
+  client: ItemClient,
+  chunkSize = 64 * 1024,
+) {
   const [a, b] = FakeChannel.pair();
   client.attach(b);
   const server = new ItemServer(a, items, { chunkSize, hash: sha256 });
@@ -139,23 +170,37 @@ function connect(items: ShareItem[], client: ItemClient, chunkSize = 64 * 1024) 
 
 describe("transfer", () => {
   it("transfers multiple files and inline text with verification", async () => {
-    const files = [randomFile(3 * MiB + 123, "a.bin"), randomFile(0, "empty.txt"), randomFile(70_000, "b.bin")];
+    const files = [
+      randomFile(3 * MiB + 123, "a.bin"),
+      randomFile(0, "empty.txt"),
+      randomFile(70_000, "b.bin"),
+    ];
     const states = new Map<number, ItemState>();
     let items: ItemMeta[] = [];
-    const client = new ItemClient({ onItems: (i) => (items = i), onState: (id, s) => states.set(id, s) });
+    const client = new ItemClient({
+      onItems: (i) => (items = i),
+      onState: (id, s) => states.set(id, s),
+    });
     connect(share(files, ["hello https://example.com"]), client);
 
     await waitFor(() => items.length === 4);
-    expect(items[3]).toMatchObject({ kind: "text", text: "hello https://example.com" });
+    expect(items[3]).toMatchObject({
+      kind: "text",
+      text: "hello https://example.com",
+    });
 
     const sinks = files.map(() => new MemorySink());
     files.forEach((_, i) => client.download(i, sinks[i]));
-    await waitFor(() => files.every((_, i) => states.get(i)?.status === "done"));
+    await waitFor(() =>
+      files.every((_, i) => states.get(i)?.status === "done"),
+    );
 
     for (let i = 0; i < files.length; i++) {
       expect(sinks[i].closed).toBe(true);
       expect(states.get(i)?.verified).toBe(true);
-      expect(await sha256(new File([sinks[i].bytes()], "x"))).toBe(await sha256(files[i]));
+      expect(await sha256(new File([sinks[i].bytes()], "x"))).toBe(
+        await sha256(files[i]),
+      );
     }
   });
 
@@ -181,7 +226,9 @@ describe("transfer", () => {
     await waitFor(() => states.get(0)?.status === "done");
 
     expect(states.get(0)?.verified).toBe(true);
-    expect(await sha256(new File([sink.bytes()], "x"))).toBe(await sha256(file));
+    expect(await sha256(new File([sink.bytes()], "x"))).toBe(
+      await sha256(file),
+    );
   });
 
   it("resumes from a checkpoint in a brand-new client (page reload)", async () => {
@@ -189,7 +236,8 @@ describe("transfer", () => {
     const items = share([file]);
     let checkpoint: { written: number; state?: Uint8Array } | undefined;
     const before = new ItemClient({
-      onCheckpoint: (_id, written, state) => (checkpoint = { written, state: state() }),
+      onCheckpoint: (_id, written, state) =>
+        (checkpoint = { written, state: state() }),
     });
     const first = connect(items, before);
     await waitFor(() => before.items.length === 1);
@@ -209,11 +257,16 @@ describe("transfer", () => {
     await waitFor(() => after.items.length === 1);
     const resumed = new MemorySink();
     resumed.parts.push(onDisk);
-    after.download(0, resumed, { offset: saved.written, hashState: saved.state });
+    after.download(0, resumed, {
+      offset: saved.written,
+      hashState: saved.state,
+    });
     await waitFor(() => after.states.get(0)?.status === "done");
 
     expect(after.states.get(0)?.verified).toBe(true);
-    expect(await sha256(new File([resumed.bytes()], "x"))).toBe(await sha256(file));
+    expect(await sha256(new File([resumed.bytes()], "x"))).toBe(
+      await sha256(file),
+    );
   });
 
   it("detects corruption", async () => {

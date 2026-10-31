@@ -1,4 +1,11 @@
-import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import QRCodeSVG from "qrcode-svg";
 
 import type { RoomInfo } from "../lib/api";
@@ -6,22 +13,63 @@ import type { ItemMeta } from "../lib/transfer/protocol";
 import { Icon, type IconName } from "./Icon";
 
 /** Circular postmark with the room name stamped around the avatar. */
-export function Postmark({ room, size = 64 }: { room: Pick<RoomInfo, "emoji" | "color" | "name">; size?: number }) {
+export function Postmark({
+  room,
+  size = 64,
+}: {
+  room: Pick<RoomInfo, "emoji" | "color" | "name">;
+  size?: number;
+}) {
   const id = `pm-${room.name.replace(/\W/g, "")}`;
   const text = `${room.name.toUpperCase()} · KABOOTAR · `;
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className="shrink-0 -rotate-12" aria-hidden>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      className="shrink-0 -rotate-12"
+      aria-hidden
+    >
       <defs>
         <path id={id} d="M50,50 m-36,0 a36,36 0 1,1 72,0 a36,36 0 1,1 -72,0" />
       </defs>
-      <circle cx="50" cy="50" r="47" fill="none" stroke={room.color} strokeOpacity="0.7" strokeWidth="2" />
-      <circle cx="50" cy="50" r="27" fill={room.color} fillOpacity="0.16" stroke={room.color} strokeOpacity="0.7" strokeWidth="1.5" />
-      <text fill={room.color} fillOpacity="0.85" fontSize="10.5" fontFamily="var(--font-mono)" letterSpacing="1.2">
+      <circle
+        cx="50"
+        cy="50"
+        r="47"
+        fill="none"
+        stroke={room.color}
+        strokeOpacity="0.7"
+        strokeWidth="2"
+      />
+      <circle
+        cx="50"
+        cy="50"
+        r="27"
+        fill={room.color}
+        fillOpacity="0.16"
+        stroke={room.color}
+        strokeOpacity="0.7"
+        strokeWidth="1.5"
+      />
+      <text
+        fill={room.color}
+        fillOpacity="0.85"
+        fontSize="10.5"
+        fontFamily="var(--font-mono)"
+        letterSpacing="1.2"
+      >
         <textPath href={`#${id}`} textLength="222">
           {text}
         </textPath>
       </text>
-      <text x="50" y="51" textAnchor="middle" dominantBaseline="central" fontSize="28">
+      <text
+        x="50"
+        y="51"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize="28"
+      >
         {room.emoji}
       </text>
     </svg>
@@ -37,7 +85,10 @@ export function Stamp({ code, emoji }: { code: string; emoji?: string }) {
           <span>AIRMAIL · CODE</span>
           {emoji && <span className="text-base leading-none">{emoji}</span>}
         </div>
-        <p className="mt-1 font-mono text-[2.6rem] leading-none font-medium tracking-[0.08em] tabular-nums" aria-label={`Code ${code.split("").join(" ")}`}>
+        <p
+          className="mt-1 font-mono text-[2.6rem] leading-none font-medium tracking-[0.08em] tabular-nums"
+          aria-label={`Code ${code.split("").join(" ")}`}
+        >
           {code.slice(0, 3)}
           <span className="text-ink/30">·</span>
           {code.slice(3)}
@@ -58,7 +109,10 @@ export function QRCode({ value }: { value: string }) {
     container: "svg-viewbox",
   }).svg();
   return (
-    <div className="rounded-lg bg-paper p-2.5 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+    <div
+      className="rounded-lg bg-paper p-2.5 [&>svg]:h-full [&>svg]:w-full"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
   );
 }
 
@@ -121,7 +175,10 @@ export function CodeInput({
   }, [autoFocus]);
 
   return (
-    <label className="relative block cursor-text" onClick={() => ref.current?.focus()}>
+    <label
+      className="relative block cursor-text"
+      onClick={() => ref.current?.focus()}
+    >
       <span className="sr-only">6-digit code</span>
       <input
         ref={ref}
@@ -142,12 +199,15 @@ export function CodeInput({
       />
       <div className="grid grid-cols-6 gap-2" aria-hidden>
         {Array.from({ length: 6 }, (_, i) => {
-          const active = focused && (i === value.length || (i === 5 && value.length === 6));
+          const active =
+            focused && (i === value.length || (i === 5 && value.length === 6));
           return (
             <div
               key={i}
               className={`flex aspect-[4/5] items-center justify-center rounded-xl border bg-ink font-mono text-2xl font-medium tabular-nums transition ${
-                active ? "border-sky shadow-[0_0_0_4px_rgb(0_223_216_/_0.15)]" : "border-white/10"
+                active
+                  ? "border-sky shadow-[0_0_0_4px_rgb(0_223_216_/_0.15)]"
+                  : "border-white/10"
               }`}
             >
               {value[i] ?? ""}
@@ -160,7 +220,8 @@ export function CodeInput({
 }
 
 export function itemIcon(item: ItemMeta): IconName {
-  if (item.kind === "text") return /^https?:\/\//i.test(item.text.trim()) ? "link" : "text";
+  if (item.kind === "text")
+    return /^https?:\/\//i.test(item.text.trim()) ? "link" : "text";
   return "file";
 }
 
@@ -175,7 +236,11 @@ export function fileKind(type: string, name: string): string {
 }
 
 export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
-  return <span className={`${className} inline-block animate-spin rounded-full border-2 border-white/20 border-t-sky`} />;
+  return (
+    <span
+      className={`${className} inline-block animate-spin rounded-full border-2 border-white/20 border-t-sky`}
+    />
+  );
 }
 
 /** Renders text with http(s) links made clickable; nothing else is interpreted. */
@@ -185,7 +250,13 @@ export function LinkifiedText({ text }: { text: string }) {
     <>
       {parts.map((p, i) =>
         /^https?:\/\//.test(p) ? (
-          <a key={i} href={p} target="_blank" rel="noopener noreferrer nofollow" className="break-all text-sky underline">
+          <a
+            key={i}
+            href={p}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="break-all text-sky underline"
+          >
             {p}
           </a>
         ) : (
@@ -224,13 +295,17 @@ export function Tip({
     const width = bubble.current.offsetWidth;
     const margin = 16;
     const left = align === "right" ? anchor.right - width : anchor.left;
-    const clamped = Math.min(Math.max(left, margin), window.innerWidth - width - margin);
+    const clamped = Math.min(
+      Math.max(left, margin),
+      window.innerWidth - width - margin,
+    );
     setShift(clamped - left);
   }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const close = (e: PointerEvent) =>
+      !ref.current?.contains(e.target as Node) && setOpen(false);
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("pointerdown", close);
     document.addEventListener("keydown", esc);

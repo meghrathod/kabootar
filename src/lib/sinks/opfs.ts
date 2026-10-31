@@ -11,7 +11,10 @@ export class OPFSSink implements Sink {
 
   private worker: Worker;
   private rid = 0;
-  private pending = new Map<number, { resolve: (position?: number) => void; reject: (e: Error) => void }>();
+  private pending = new Map<
+    number,
+    { resolve: (position?: number) => void; reject: (e: Error) => void }
+  >();
   /** Folder inside OPFS holding this file; persisted to resume after a reload. */
   readonly dir: string;
   startAt = 0;
@@ -20,29 +23,59 @@ export class OPFSSink implements Sink {
   private constructor(meta: FileMeta, dir?: string) {
     this.dir = dir ?? crypto.randomUUID();
     this.name = sanitizeName(meta.name);
-    this.worker = new Worker(new URL("../../workers/opfs.worker.ts", import.meta.url), { type: "module" });
-    this.worker.onmessage = (e: MessageEvent<{ rid: number; ok: boolean; error?: string; position?: number }>) => {
+    this.worker = new Worker(
+      new URL("../../workers/opfs.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+    this.worker.onmessage = (
+      e: MessageEvent<{
+        rid: number;
+        ok: boolean;
+        error?: string;
+        position?: number;
+      }>,
+    ) => {
       const p = this.pending.get(e.data.rid);
       this.pending.delete(e.data.rid);
       if (e.data.ok) p?.resolve(e.data.position);
       else p?.reject(new Error(e.data.error ?? "write failed"));
     };
     this.worker.onerror = () => {
-      for (const p of this.pending.values()) p.reject(new Error("Storage worker crashed"));
+      for (const p of this.pending.values())
+        p.reject(new Error("Storage worker crashed"));
       this.pending.clear();
     };
   }
 
   /** Open a new file, or reopen a partial one at `resume.offset` after a reload. */
-  static async open(meta: FileMeta, resume?: { dir: string; offset: number }): Promise<OPFSSink> {
-    const estimate = await navigator.storage.estimate?.().catch(() => undefined);
+  static async open(
+    meta: FileMeta,
+    resume?: { dir: string; offset: number },
+  ): Promise<OPFSSink> {
+    const estimate = await navigator.storage
+      .estimate?.()
+      .catch(() => undefined);
     const needed = meta.size - (resume?.offset ?? 0);
-    if (estimate?.quota && estimate.usage !== undefined && estimate.quota - estimate.usage < needed) {
+    if (
+      estimate?.quota &&
+      estimate.usage !== undefined &&
+      estimate.quota - estimate.usage < needed
+    ) {
       throw new Error("Not enough storage space on this device for this file");
     }
     const sink = new OPFSSink(meta, resume?.dir);
     try {
-      sink.startAt = (await sink.call({ op: "open", dir: sink.dir, name: sink.name, at: resume?.offset ?? 0 }, [], 8000)) ?? 0;
+      sink.startAt =
+        (await sink.call(
+          {
+            op: "open",
+            dir: sink.dir,
+            name: sink.name,
+            at: resume?.offset ?? 0,
+          },
+          [],
+          8000,
+        )) ?? 0;
       return sink;
     } catch (err) {
       sink.worker.terminate();
@@ -55,7 +88,11 @@ export class OPFSSink implements Sink {
    * iOS versions OPFS can stop answering, and a silent hang would leave the
    * transfer stuck at 0%.
    */
-  private call(msg: Record<string, unknown>, transfer: Transferable[] = [], timeoutMs = 20_000): Promise<number | undefined> {
+  private call(
+    msg: Record<string, unknown>,
+    transfer: Transferable[] = [],
+    timeoutMs = 20_000,
+  ): Promise<number | undefined> {
     const rid = this.rid++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -82,7 +119,9 @@ export class OPFSSink implements Sink {
     await this.call({ op: "close" });
     this.worker.terminate();
     const root = await navigator.storage.getDirectory();
-    const dir = await (await root.getDirectoryHandle("incoming")).getDirectoryHandle(this.dir);
+    const dir = await (
+      await root.getDirectoryHandle("incoming")
+    ).getDirectoryHandle(this.dir);
     return (await dir.getFileHandle(this.name)).getFile();
   }
 
@@ -101,8 +140,11 @@ export async function clearIncoming(keep: Set<string> = new Set()) {
   try {
     const root = await navigator.storage.getDirectory();
     const incoming = await root.getDirectoryHandle("incoming");
-    for await (const name of (incoming as FileSystemDirectoryHandle & { keys(): AsyncIterable<string> }).keys()) {
-      if (!keep.has(name)) await incoming.removeEntry(name, { recursive: true }).catch(() => {});
+    for await (const name of (
+      incoming as FileSystemDirectoryHandle & { keys(): AsyncIterable<string> }
+    ).keys()) {
+      if (!keep.has(name))
+        await incoming.removeEntry(name, { recursive: true }).catch(() => {});
     }
   } catch {
     // nothing to clear

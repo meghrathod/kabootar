@@ -12,7 +12,11 @@ async function receiverContext(ctx: BrowserContext) {
   });
 }
 
-async function startShare(page: Page, files: { name: string; mimeType: string; buffer: Buffer }[], text?: string) {
+async function startShare(
+  page: Page,
+  files: { name: string; mimeType: string; buffer: Buffer }[],
+  text?: string,
+) {
   await page.goto("/");
   await page.locator('input[type="file"][multiple]').setInputFiles(files);
   if (text) {
@@ -22,25 +26,46 @@ async function startShare(page: Page, files: { name: string; mimeType: string; b
   }
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Live: keep this page open")).toBeVisible();
-  const code = (await page.getByLabel(/^Code /).textContent())!.replace(/\D/g, "");
+  const code = (await page.getByLabel(/^Code /).textContent())!.replace(
+    /\D/g,
+    "",
+  );
   return { link: page.url(), code };
 }
 
-test("sends files and text peer-to-peer and verifies integrity", async ({ browser }) => {
+test("sends files and text peer-to-peer and verifies integrity", async ({
+  browser,
+}) => {
   const sender = await browser.newContext();
   const receiver = await browser.newContext({ acceptDownloads: true });
   await receiverContext(receiver);
 
-  const big = { name: "big.bin", mimeType: "application/octet-stream", buffer: randomBytes(12 * 1024 * 1024 + 7) };
-  const small = { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("hello from kabootar\n") };
+  const big = {
+    name: "big.bin",
+    mimeType: "application/octet-stream",
+    buffer: randomBytes(12 * 1024 * 1024 + 7),
+  };
+  const small = {
+    name: "notes.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("hello from kabootar\n"),
+  };
 
   const sp = await sender.newPage();
-  const { link } = await startShare(sp, [big, small], "Wi-Fi password: hunter2 https://example.com");
+  const { link } = await startShare(
+    sp,
+    [big, small],
+    "Wi-Fi password: hunter2 https://example.com",
+  );
 
   const rp = await receiver.newPage();
   await rp.goto(link);
-  await expect(rp.getByText("Wi-Fi password: hunter2")).toBeVisible({ timeout: 30_000 });
-  await expect(rp.getByRole("link", { name: "https://example.com" })).toHaveAttribute("rel", /noopener/);
+  await expect(rp.getByText("Wi-Fi password: hunter2")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(
+    rp.getByRole("link", { name: "https://example.com" }),
+  ).toHaveAttribute("rel", /noopener/);
   await expect(rp.getByText("big.bin")).toBeVisible();
 
   const downloads: Promise<import("@playwright/test").Download>[] = [];
@@ -64,7 +89,9 @@ test("sends files and text peer-to-peer and verifies integrity", async ({ browse
   // Ending the share tells the receiver.
   await sp.getByRole("button", { name: "Stop" }).click();
   await sp.getByRole("button", { name: "Stop sharing" }).click();
-  await expect(rp.getByText(/All files received|Sender stopped sharing/)).toBeVisible();
+  await expect(
+    rp.getByText(/All files received|Sender stopped sharing/),
+  ).toBeVisible();
 
   await sender.close();
   await receiver.close();
@@ -76,7 +103,9 @@ test("joins with the 6-digit code", async ({ browser }) => {
   await receiverContext(receiver);
 
   const sp = await sender.newPage();
-  const { code } = await startShare(sp, [{ name: "a.txt", mimeType: "text/plain", buffer: Buffer.from("a") }]);
+  const { code } = await startShare(sp, [
+    { name: "a.txt", mimeType: "text/plain", buffer: Buffer.from("a") },
+  ]);
 
   const rp = await receiver.newPage();
   await rp.goto("/receive");
@@ -97,22 +126,36 @@ test("wrong code shows an error", async ({ page }) => {
 test("app shell, manifest and security headers", async ({ request }) => {
   const res = await request.get("/some/deep/link");
   expect(res.status()).toBe(200);
-  expect(res.headers()["content-security-policy"]).toContain("default-src 'self'");
+  expect(res.headers()["content-security-policy"]).toContain(
+    "default-src 'self'",
+  );
   const manifest = await (await request.get("/manifest.webmanifest")).json();
   expect(manifest.share_target.action).toBe("/share-target");
-  expect(manifest.icons.some((i: { purpose: string }) => i.purpose === "maskable")).toBe(true);
+  expect(
+    manifest.icons.some((i: { purpose: string }) => i.purpose === "maskable"),
+  ).toBe(true);
 });
 
-test("returning visitor downloads through the service worker", async ({ browser }) => {
+test("returning visitor downloads through the service worker", async ({
+  browser,
+}) => {
   const sender = await browser.newContext();
   const receiver = await browser.newContext({ acceptDownloads: true });
   await receiverContext(receiver);
 
   const rp = await receiver.newPage();
   await rp.goto("/");
-  await expect.poll(() => rp.evaluate(() => !!navigator.serviceWorker.controller), { timeout: 15_000 }).toBe(true);
+  await expect
+    .poll(() => rp.evaluate(() => !!navigator.serviceWorker.controller), {
+      timeout: 15_000,
+    })
+    .toBe(true);
 
-  const file = { name: "streamed.bin", mimeType: "application/octet-stream", buffer: randomBytes(40 * 1024 * 1024) };
+  const file = {
+    name: "streamed.bin",
+    mimeType: "application/octet-stream",
+    buffer: randomBytes(40 * 1024 * 1024),
+  };
   const sp = await sender.newPage();
   const { link } = await startShare(sp, [file]);
 
@@ -128,14 +171,23 @@ test("returning visitor downloads through the service worker", async ({ browser 
   await receiver.close();
 });
 
-test("receiver reload resumes the download and keeps its identity", async ({ browser }) => {
+test("receiver reload resumes the download and keeps its identity", async ({
+  browser,
+}) => {
   const sender = await browser.newContext();
   // Without a service worker Chromium saves to device storage (OPFS): the
   // same path iOS uses, and the one that can resume after a reload.
-  const receiver = await browser.newContext({ acceptDownloads: true, serviceWorkers: "block" });
+  const receiver = await browser.newContext({
+    acceptDownloads: true,
+    serviceWorkers: "block",
+  });
   await receiverContext(receiver);
 
-  const file = { name: "resume.bin", mimeType: "application/octet-stream", buffer: randomBytes(45 * 1024 * 1024) };
+  const file = {
+    name: "resume.bin",
+    mimeType: "application/octet-stream",
+    buffer: randomBytes(45 * 1024 * 1024),
+  };
   const sp = await sender.newPage();
   const { link } = await startShare(sp, [file]);
 
@@ -146,13 +198,19 @@ test("receiver reload resumes the download and keeps its identity", async ({ bro
   await expect(rp.getByText("resume.bin")).toBeVisible({ timeout: 30_000 });
   await rp.getByRole("button", { name: /^Download ·/ }).click();
   await expect.poll(() => logs.some((l) => l.includes("via opfs"))).toBe(true);
-  await expect(rp.getByText(/[1-9][\d.]* MB of/)).toBeVisible({ timeout: 30_000 });
+  await expect(rp.getByText(/[1-9][\d.]* MB of/)).toBeVisible({
+    timeout: 30_000,
+  });
 
   const download = rp.waitForEvent("download", { timeout: 60_000 });
   await rp.reload();
-  await expect.poll(() => logs.some((l) => l.includes("resuming \"resume.bin\""))).toBe(true);
+  await expect
+    .poll(() => logs.some((l) => l.includes('resuming "resume.bin"')))
+    .toBe(true);
   await expect(rp.getByText("Verified")).toBeVisible({ timeout: 60_000 });
-  expect(sha(await readFile((await (await download).path())!))).toBe(sha(file.buffer));
+  expect(sha(await readFile((await (await download).path())!))).toBe(
+    sha(file.buffer),
+  );
 
   // Still one receiver on the sender's side.
   await expect(sp.getByText(/^Receiver \d/)).toHaveCount(1);
@@ -161,12 +219,18 @@ test("receiver reload resumes the download and keeps its identity", async ({ bro
   await receiver.close();
 });
 
-test("sender reload resumes the same share after re-adding files", async ({ browser }) => {
+test("sender reload resumes the same share after re-adding files", async ({
+  browser,
+}) => {
   const sender = await browser.newContext();
   const receiver = await browser.newContext({ acceptDownloads: true });
   await receiverContext(receiver);
 
-  const file = { name: "again.bin", mimeType: "application/octet-stream", buffer: randomBytes(3 * 1024 * 1024) };
+  const file = {
+    name: "again.bin",
+    mimeType: "application/octet-stream",
+    buffer: randomBytes(3 * 1024 * 1024),
+  };
   const sp = await sender.newPage();
   const { link, code } = await startShare(sp, [file]);
 
@@ -179,15 +243,23 @@ test("sender reload resumes the same share after re-adding files", async ({ brow
   await sp.reload();
   await expect(sp.getByText("Continue sharing")).toBeVisible();
   await sp.locator('input[type="file"][multiple]').setInputFiles([file]);
-  await expect(sp.getByText("Live: keep this page open")).toBeVisible({ timeout: 15_000 });
-  expect((await sp.getByLabel(/^Code /).textContent())!.replace(/\D/g, "")).toBe(code);
+  await expect(sp.getByText("Live: keep this page open")).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(
+    (await sp.getByLabel(/^Code /).textContent())!.replace(/\D/g, ""),
+  ).toBe(code);
 
   // The receiver reconnects on its own and can download.
   const download = rp.waitForEvent("download", { timeout: 60_000 });
-  await expect(rp.getByRole("button", { name: /^Download ·/ })).toBeEnabled({ timeout: 30_000 });
+  await expect(rp.getByRole("button", { name: /^Download ·/ })).toBeEnabled({
+    timeout: 30_000,
+  });
   await rp.getByRole("button", { name: /^Download ·/ }).click();
   await expect(rp.getByText("Verified")).toBeVisible({ timeout: 30_000 });
-  expect(sha(await readFile((await (await download).path())!))).toBe(sha(file.buffer));
+  expect(sha(await readFile((await (await download).path())!))).toBe(
+    sha(file.buffer),
+  );
 
   await sender.close();
   await receiver.close();

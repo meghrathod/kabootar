@@ -5,16 +5,40 @@ import { Icon } from "../components/Icon";
 import { Centered } from "../components/Centered";
 import { Logo } from "../components/Logo";
 import { toast } from "../components/Toasts";
-import { CodeInput, Dialog, LinkifiedText, Postmark, QRCode, Spinner, Stamp, Tip, fileKind } from "../components/ui";
+import {
+  CodeInput,
+  Dialog,
+  LinkifiedText,
+  Postmark,
+  QRCode,
+  Spinner,
+  Stamp,
+  Tip,
+  fileKind,
+} from "../components/ui";
 import { errorMessage, joinWithPin } from "../lib/api";
 import { formatBytes, formatDuration, formatSpeed } from "../lib/format";
 import { isIOS } from "../lib/platform";
 import { ReceiverSession, type ReceiverState } from "../lib/receiver";
-import { encryptionHelp, nearbyHiddenHelp, relayAvailableHelp, routeHelp, routeLabel, senderAwayHelp, verifiedHelp } from "../lib/rtc";
+import {
+  encryptionHelp,
+  nearbyHiddenHelp,
+  relayAvailableHelp,
+  routeHelp,
+  routeLabel,
+  senderAwayHelp,
+  verifiedHelp,
+} from "../lib/rtc";
 import { type SavedShare, dropShare, savedShare } from "../lib/resume";
 import { type PeerView, SenderSession, senderSlot } from "../lib/sender";
 import { endShare } from "../lib/signal";
-import { bestStrategy, pickDirectory, pickSaveFile, shareOrDownload, supportsFolderSave } from "../lib/sinks";
+import {
+  bestStrategy,
+  pickDirectory,
+  pickSaveFile,
+  shareOrDownload,
+  supportsFolderSave,
+} from "../lib/sinks";
 import { stage } from "../lib/stage";
 import type { ItemState } from "../lib/transfer/client";
 import type { FileMeta, ItemMeta } from "../lib/transfer/protocol";
@@ -49,12 +73,21 @@ function ResumeShare({ saved }: { saved: SavedShare }) {
   const add = (files: Iterable<File>) => {
     const next = new Map(matched);
     for (const f of files) {
-      const item = needed.find(
-        (i) => !next.has(i.id) && i.name === f.name && i.size === f.size && (!i.lastModified || i.lastModified === f.lastModified),
-      ) ?? needed.find((i) => !next.has(i.id) && i.name === f.name && i.size === f.size);
+      const item =
+        needed.find(
+          (i) =>
+            !next.has(i.id) &&
+            i.name === f.name &&
+            i.size === f.size &&
+            (!i.lastModified || i.lastModified === f.lastModified),
+        ) ??
+        needed.find(
+          (i) => !next.has(i.id) && i.name === f.name && i.size === f.size,
+        );
       if (item) next.set(item.id, f);
     }
-    if (next.size === matched.size) toast("Those aren't the files from this share", "error");
+    if (next.size === matched.size)
+      toast("Those aren't the files from this share", "error");
     setMatched(next);
   };
 
@@ -78,8 +111,9 @@ function ResumeShare({ saved }: { saved: SavedShare }) {
     <Shell>
       <h1 className="font-display text-2xl font-semibold">Continue sharing</h1>
       <p className="mt-1 text-sm text-white/60">
-        Reloading the page cleared access to your files. Add the same files again to keep sharing as{" "}
-        <b>{saved.created.name}</b>. Receivers will pick up where they left off.
+        Reloading the page cleared access to your files. Add the same files
+        again to keep sharing as <b>{saved.created.name}</b>. Receivers will
+        pick up where they left off.
       </p>
       <ul
         className="mt-5 divide-y divide-white/5"
@@ -101,12 +135,16 @@ function ResumeShare({ saved }: { saved: SavedShare }) {
         ))}
       </ul>
       <div className="mt-5 flex flex-wrap gap-2">
-        <button className="btn-primary flex-1" onClick={() => input.current?.click()}>
+        <button
+          className="btn-primary flex-1"
+          onClick={() => input.current?.click()}
+        >
           <Icon name="plus" className="h-4 w-4" /> Add files
         </button>
         {matched.size > 0 && missing.length > 0 && (
           <button className="btn-ghost" onClick={resume}>
-            Continue without {missing.length} file{missing.length > 1 ? "s" : ""}
+            Continue without {missing.length} file
+            {missing.length > 1 ? "s" : ""}
           </button>
         )}
         <button className="btn-danger" onClick={end} disabled={ending}>
@@ -146,8 +184,16 @@ function NeedCode({ roomId }: { roomId: string }) {
   return (
     <Shell>
       <h1 className="font-display text-xl font-bold">Enter the code</h1>
-      <p className="mt-1 mb-5 text-sm text-white/60">This link is missing its key. Enter the 6-digit code from the sender.</p>
-      <CodeInput value={pin} onChange={setPin} onComplete={join} autoFocus disabled={busy} />
+      <p className="mt-1 mb-5 text-sm text-white/60">
+        This link is missing its key. Enter the 6-digit code from the sender.
+      </p>
+      <CodeInput
+        value={pin}
+        onChange={setPin}
+        onComplete={join}
+        autoFocus
+        disabled={busy}
+      />
     </Shell>
   );
 }
@@ -157,16 +203,23 @@ function Shell({ children }: { children: React.ReactNode }) {
     <Centered className="max-w-xl">
       <Logo size="5rem" link />
       <div className="h-6" />
-      <div className="panel animate-rise p-5 md:p-7">
-        {children}
-      </div>
+      <div className="panel animate-rise p-5 md:p-7">{children}</div>
     </Centered>
   );
 }
 
 function StatusDot({ tone }: { tone: "ok" | "warn" | "bad" | "idle" }) {
-  const c = { ok: "bg-emerald-400", warn: "bg-amber-400", bad: "bg-rose-400", idle: "bg-white/40" }[tone];
-  return <span className={`h-2 w-2 rounded-full ${c} ${tone === "ok" ? "animate-pulse" : ""}`} />;
+  const c = {
+    ok: "bg-emerald-400",
+    warn: "bg-amber-400",
+    bad: "bg-rose-400",
+    idle: "bg-white/40",
+  }[tone];
+  return (
+    <span
+      className={`h-2 w-2 rounded-full ${c} ${tone === "ok" ? "animate-pulse" : ""}`}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +262,13 @@ function SenderView({ session }: { session: SenderSession }) {
     toast("Link copied", "success");
   };
   const share = () =>
-    navigator.share?.({ title: "Kabootar", text: `Get my files on Kabootar (code ${s.pin})`, url: s.link }).catch(() => {});
+    navigator
+      .share?.({
+        title: "Kabootar",
+        text: `Get my files on Kabootar (code ${s.pin})`,
+        url: s.link,
+      })
+      .catch(() => {});
 
   const stop = () => {
     session.end();
@@ -220,8 +279,12 @@ function SenderView({ session }: { session: SenderSession }) {
   if (s.status !== "live") {
     return (
       <Shell>
-        <h1 className="font-display text-xl font-bold">{s.status === "error" ? "Share stopped" : "Share ended"}</h1>
-        <p className="mt-1 text-sm text-white/60">{s.error ?? "Receivers can no longer download these files."}</p>
+        <h1 className="font-display text-xl font-bold">
+          {s.status === "error" ? "Share stopped" : "Share ended"}
+        </h1>
+        <p className="mt-1 text-sm text-white/60">
+          {s.error ?? "Receivers can no longer download these files."}
+        </p>
         <button
           className="btn-primary mt-5"
           onClick={() => {
@@ -246,13 +309,20 @@ function SenderView({ session }: { session: SenderSession }) {
         <header className="flex items-center gap-4">
           <Postmark room={s.room} />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-2xl font-semibold">{s.room.name}</h1>
+            <h1 className="truncate font-display text-2xl font-semibold">
+              {s.room.name}
+            </h1>
             <p className="flex items-center gap-2 text-xs text-white/55">
               <StatusDot tone={s.signal === "open" ? "ok" : "warn"} />
-              {s.signal === "open" ? "Live: keep this page open" : "Reconnecting to server…"}
+              {s.signal === "open"
+                ? "Live: keep this page open"
+                : "Reconnecting to server…"}
             </p>
           </div>
-          <button className="btn-danger py-2" onClick={() => setConfirmStop(true)}>
+          <button
+            className="btn-danger py-2"
+            onClick={() => setConfirmStop(true)}
+          >
             <Icon name="stop" className="h-4 w-4" /> Stop
           </button>
         </header>
@@ -261,10 +331,17 @@ function SenderView({ session }: { session: SenderSession }) {
           <div>
             <Stamp code={s.pin} emoji={s.room.emoji} />
             <p className="label mt-3">
-              Enter at <span className="text-white/75 normal-case">{location.host}/receive</span>
+              Enter at{" "}
+              <span className="text-white/75 normal-case">
+                {location.host}/receive
+              </span>
             </p>
           </div>
-          <button className="mx-auto w-32 md:w-28" onClick={() => setQrOpen(true)} aria-label="Show QR code">
+          <button
+            className="mx-auto w-32 md:w-28"
+            onClick={() => setQrOpen(true)}
+            aria-label="Show QR code"
+          >
             <QRCode value={s.link} />
           </button>
         </div>
@@ -283,7 +360,8 @@ function SenderView({ session }: { session: SenderSession }) {
         <div className="mt-6 flex flex-wrap gap-2">
           <span className="chip">
             <Icon name="file" className="h-3.5 w-3.5" />
-            {fileCount > 0 && `${fileCount} file${fileCount > 1 ? "s" : ""} · ${formatBytes(s.totalBytes)}`}
+            {fileCount > 0 &&
+              `${fileCount} file${fileCount > 1 ? "s" : ""} · ${formatBytes(s.totalBytes)}`}
             {fileCount > 0 && textCount > 0 && " + "}
             {textCount > 0 && `${textCount} text`}
           </span>
@@ -318,7 +396,11 @@ function SenderView({ session }: { session: SenderSession }) {
         </section>
       </div>
 
-      <Dialog open={qrOpen} onClose={() => setQrOpen(false)} title="Scan to receive">
+      <Dialog
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        title="Scan to receive"
+      >
         <div className="mx-auto w-64">
           <QRCode value={s.link} />
         </div>
@@ -326,8 +408,14 @@ function SenderView({ session }: { session: SenderSession }) {
           Or enter code <b className="tabular-nums">{s.pin}</b>
         </p>
       </Dialog>
-      <Dialog open={confirmStop} onClose={() => setConfirmStop(false)} title="Stop sharing?">
-        <p className="text-sm text-white/60">Anyone still downloading will be disconnected.</p>
+      <Dialog
+        open={confirmStop}
+        onClose={() => setConfirmStop(false)}
+        title="Stop sharing?"
+      >
+        <p className="text-sm text-white/60">
+          Anyone still downloading will be disconnected.
+        </p>
         <div className="mt-5 flex justify-end gap-2">
           <button className="btn-ghost" onClick={() => setConfirmStop(false)}>
             Keep sharing
@@ -341,11 +429,28 @@ function SenderView({ session }: { session: SenderSession }) {
   );
 }
 
-function PeerRow({ peer, index, items }: { peer: PeerView; index: number; items: ItemMeta[] }) {
-  const current = peer.current ? items.find((i) => i.id === peer.current!.id) : undefined;
+function PeerRow({
+  peer,
+  index,
+  items,
+}: {
+  peer: PeerView;
+  index: number;
+  items: ItemMeta[];
+}) {
+  const current = peer.current
+    ? items.find((i) => i.id === peer.current!.id)
+    : undefined;
   const size = current?.kind === "file" ? current.size : 0;
   const pct = size ? Math.min(100, (peer.current!.acked / size) * 100) : 0;
-  const tone = peer.state === "failed" ? "bad" : peer.state === "connecting" || peer.state === "reconnecting" ? "warn" : peer.state === "left" ? "idle" : "ok";
+  const tone =
+    peer.state === "failed"
+      ? "bad"
+      : peer.state === "connecting" || peer.state === "reconnecting"
+        ? "warn"
+        : peer.state === "left"
+          ? "idle"
+          : "ok";
   return (
     <li className="rounded-2xl border border-white/5 bg-white/[0.03] p-3">
       <div className="flex items-center gap-2 text-sm">
@@ -354,7 +459,11 @@ function PeerRow({ peer, index, items }: { peer: PeerView; index: number; items:
         <span className="text-white/45">· {peerLabel[peer.state]}</span>
         {peer.route && (
           <span className="ml-auto">
-            <Tip tip={routeHelp[peer.route]} align="right" className="inline-flex items-center gap-1 text-xs text-white/45">
+            <Tip
+              tip={routeHelp[peer.route]}
+              align="right"
+              className="inline-flex items-center gap-1 text-xs text-white/45"
+            >
               {routeLabel[peer.route]}
             </Tip>
           </span>
@@ -364,7 +473,9 @@ function PeerRow({ peer, index, items }: { peer: PeerView; index: number; items:
         <div className="mt-2">
           <div className="flex justify-between text-xs text-white/55">
             <span className="truncate pr-2">{current.name}</span>
-            <span className="tabular-nums">{peer.speed > 0 ? formatSpeed(peer.speed) : `${pct.toFixed(0)}%`}</span>
+            <span className="tabular-nums">
+              {peer.speed > 0 ? formatSpeed(peer.speed) : `${pct.toFixed(0)}%`}
+            </span>
           </div>
           <div className="progress mt-1.5">
             <span style={{ width: `${pct}%` }} />
@@ -373,7 +484,8 @@ function PeerRow({ peer, index, items }: { peer: PeerView; index: number; items:
       )}
       {peer.completed.length > 0 && (
         <p className="mt-2 flex items-center gap-1 text-xs text-emerald-300/90">
-          <Icon name="check" className="h-3.5 w-3.5" /> {peer.completed.length} file{peer.completed.length > 1 ? "s" : ""} delivered
+          <Icon name="check" className="h-3.5 w-3.5" /> {peer.completed.length}{" "}
+          file{peer.completed.length > 1 ? "s" : ""} delivered
         </p>
       )}
     </li>
@@ -392,9 +504,18 @@ const statusText: Record<ReceiverState["status"], string> = {
   error: "Connection failed",
 };
 
-function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string }) {
+function ReceiverView({
+  roomId,
+  clientKey,
+}: {
+  roomId: string;
+  clientKey: string;
+}) {
   const navigate = useNavigate();
-  const session = useMemo(() => new ReceiverSession(roomId, clientKey), [roomId, clientKey]);
+  const session = useMemo(
+    () => new ReceiverSession(roomId, clientKey),
+    [roomId, clientKey],
+  );
   useEffect(() => () => session.leave(), [session]);
   const s = useStore(session.store);
   const [slow, setSlow] = useState(false);
@@ -403,11 +524,18 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
   const files = s.items.filter((i): i is FileMeta => i.kind === "file");
   const texts = s.items.filter((i) => i.kind === "text");
   const states = s.states;
-  const active = files.filter((f) => ["queued", "receiving", "verifying"].includes(states[f.id]?.status ?? ""));
+  const active = files.filter((f) =>
+    ["queued", "receiving", "verifying"].includes(states[f.id]?.status ?? ""),
+  );
   const done = files.filter((f) => states[f.id]?.status === "done");
-  const pending = files.filter((f) => ["idle", "error", "cancelled", undefined].includes(states[f.id]?.status));
+  const pending = files.filter((f) =>
+    ["idle", "error", "cancelled", undefined].includes(states[f.id]?.status),
+  );
   const requestedBytes = [...active, ...done].reduce((n, f) => n + f.size, 0);
-  const receivedBytes = [...active, ...done].reduce((n, f) => n + (states[f.id]?.received ?? 0), 0);
+  const receivedBytes = [...active, ...done].reduce(
+    (n, f) => n + (states[f.id]?.received ?? 0),
+    0,
+  );
   const remaining = requestedBytes - receivedBytes;
 
   useEffect(() => {
@@ -439,7 +567,8 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
         session.download([meta.id]);
       }
     } catch (err) {
-      if (!(err instanceof DOMException && err.name === "AbortError")) toast(errorMessage(err), "error");
+      if (!(err instanceof DOMException && err.name === "AbortError"))
+        toast(errorMessage(err), "error");
     }
   };
 
@@ -456,12 +585,20 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
         session.download(ids);
       }
     } catch (err) {
-      if (!(err instanceof DOMException && err.name === "AbortError")) toast(errorMessage(err), "error");
+      if (!(err instanceof DOMException && err.name === "AbortError"))
+        toast(errorMessage(err), "error");
     }
   };
 
   const ended = s.status === "closed" || s.status === "error";
-  const tone = s.status === "connected" ? "ok" : ended ? (s.status === "error" ? "bad" : "idle") : "warn";
+  const tone =
+    s.status === "connected"
+      ? "ok"
+      : ended
+        ? s.status === "error"
+          ? "bad"
+          : "idle"
+        : "warn";
   const bigOnIOS = isIOS && files.some((f) => f.size > 2 * 1024 ** 3);
 
   // Leaving drops an active transfer, and on iPhone files received into
@@ -471,7 +608,8 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
     session.leave();
     navigate("/", { replace: true });
   };
-  const requestLeave = () => (active.length > 0 || unsaved ? setConfirmLeave(true) : leave());
+  const requestLeave = () =>
+    active.length > 0 || unsaved ? setConfirmLeave(true) : leave();
 
   return (
     <Centered className="max-w-xl">
@@ -479,19 +617,30 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
       <div className="h-6" />
       <div className="panel animate-rise p-5 md:p-7">
         <header className="flex items-center gap-4">
-          <button className="icon-btn -ml-2 shrink-0" onClick={requestLeave} aria-label="Leave and go home">
+          <button
+            className="icon-btn -ml-2 shrink-0"
+            onClick={requestLeave}
+            aria-label="Leave and go home"
+          >
             <Icon name="arrowLeft" />
           </button>
-          {s.room ? <Postmark room={s.room} /> : <div className="h-16 w-16 animate-pulse rounded-full bg-white/10" />}
+          {s.room ? (
+            <Postmark room={s.room} />
+          ) : (
+            <div className="h-16 w-16 animate-pulse rounded-full bg-white/10" />
+          )}
           <div className="min-w-0 flex-1">
             <p className="label">Receiving from</p>
-            <h1 className="truncate font-display text-2xl font-semibold">{s.room?.name ?? "…"}</h1>
+            <h1 className="truncate font-display text-2xl font-semibold">
+              {s.room?.name ?? "…"}
+            </h1>
           </div>
         </header>
 
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-white/60">
           <span className="chip">
-            <StatusDot tone={tone} /> {allDone && ended ? "All files received" : statusText[s.status]}
+            <StatusDot tone={tone} />{" "}
+            {allDone && ended ? "All files received" : statusText[s.status]}
           </span>
           {s.route && <Tip tip={routeHelp[s.route]}>{routeLabel[s.route]}</Tip>}
           <Tip tip={encryptionHelp}>
@@ -504,24 +653,31 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
           )}
         </div>
 
-        {(s.status === "connecting" || s.status === "waiting") && s.items.length === 0 && (
-          <div className="mt-8 flex flex-col items-center gap-3 py-6 text-center">
-            <span className="relative flex h-16 w-16 items-center justify-center">
-              <span className="absolute inset-0 animate-ping rounded-full bg-sky/15" />
-              <span className="absolute inset-2 animate-pulse rounded-full bg-sky/10" />
-              <Icon name="radar" className="h-7 w-7 text-sky" />
-            </span>
-            <p className="text-sm text-white/60">Establishing a secure peer-to-peer connection…</p>
-            {slow && (
-              <p className="max-w-xs text-xs text-white/40">
-                Taking a while? Make sure the sender still has Kabootar open. Some strict networks block direct
-                connections.
+        {(s.status === "connecting" || s.status === "waiting") &&
+          s.items.length === 0 && (
+            <div className="mt-8 flex flex-col items-center gap-3 py-6 text-center">
+              <span className="relative flex h-16 w-16 items-center justify-center">
+                <span className="absolute inset-0 animate-ping rounded-full bg-sky/15" />
+                <span className="absolute inset-2 animate-pulse rounded-full bg-sky/10" />
+                <Icon name="radar" className="h-7 w-7 text-sky" />
+              </span>
+              <p className="text-sm text-white/60">
+                Establishing a secure peer-to-peer connection…
               </p>
-            )}
-          </div>
-        )}
+              {slow && (
+                <p className="max-w-xs text-xs text-white/40">
+                  Taking a while? Make sure the sender still has Kabootar open.
+                  Some strict networks block direct connections.
+                </p>
+              )}
+            </div>
+          )}
 
-        {s.error && <p className="mt-4 rounded-2xl bg-rose-500/10 p-3 text-sm text-rose-200">{s.error}</p>}
+        {s.error && (
+          <p className="mt-4 rounded-2xl bg-rose-500/10 p-3 text-sm text-rose-200">
+            {s.error}
+          </p>
+        )}
 
         {texts.length > 0 && (
           <ul className="mt-5 space-y-2">
@@ -548,8 +704,9 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
 
         {bigOnIOS && (
           <p className="mt-4 rounded-2xl bg-amber-400/10 p-3 text-xs text-amber-100/90">
-            Large files are written to this device's storage first, then you save them with the share sheet. Keep
-            Kabootar open and the screen on until it finishes.
+            Large files are written to this device's storage first, then you
+            save them with the share sheet. Keep Kabootar open and the screen on
+            until it finishes.
           </p>
         )}
 
@@ -560,18 +717,31 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
                 {formatBytes(receivedBytes)} of {formatBytes(requestedBytes)}
               </span>
               <span className="text-white/60 tabular-nums">
-                {formatSpeed(s.speed)} · {s.speed > 0 ? formatDuration(remaining / s.speed) : "–"} left
+                {formatSpeed(s.speed)} ·{" "}
+                {s.speed > 0 ? formatDuration(remaining / s.speed) : "–"} left
               </span>
             </div>
             <div className="progress mt-2">
-              <span style={{ width: `${requestedBytes ? (receivedBytes / requestedBytes) * 100 : 0}%` }} />
+              <span
+                style={{
+                  width: `${requestedBytes ? (receivedBytes / requestedBytes) * 100 : 0}%`,
+                }}
+              />
             </div>
           </div>
         )}
 
         {pending.length > 0 && !ended && (
-          <button className="btn-primary mt-5 w-full py-4 text-base" disabled={s.status !== "connected"} onClick={downloadAll}>
-            <Icon name={supportsFolderSave && pending.length > 1 ? "folder" : "download"} />
+          <button
+            className="btn-primary mt-5 w-full py-4 text-base"
+            disabled={s.status !== "connected"}
+            onClick={downloadAll}
+          >
+            <Icon
+              name={
+                supportsFolderSave && pending.length > 1 ? "folder" : "download"
+              }
+            />
             {pending.length === 1
               ? `Download · ${formatBytes(pending[0].size)}`
               : supportsFolderSave
@@ -586,7 +756,11 @@ function ReceiverView({ roomId, clientKey }: { roomId: string; clientKey: string
           </Link>
         )}
       </div>
-      <Dialog open={confirmLeave} onClose={() => setConfirmLeave(false)} title="Leave this share?">
+      <Dialog
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        title="Leave this share?"
+      >
         <p className="text-sm text-white/60">
           {active.length > 0
             ? "The download in progress will stop."
@@ -640,38 +814,64 @@ function FileRow({
   onCancel: () => void;
 }) {
   const st = state?.status ?? "idle";
-  const pct = meta.size ? ((state?.received ?? 0) / meta.size) * 100 : st === "done" ? 100 : 0;
+  const pct = meta.size
+    ? ((state?.received ?? 0) / meta.size) * 100
+    : st === "done"
+      ? 100
+      : 0;
   return (
     <li className="py-3">
       <div className="flex items-center gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5 text-white/70">
-          <Icon name={st === "done" ? "check" : "file"} className={st === "done" ? "h-5 w-5 text-emerald-300" : "h-5 w-5"} />
+          <Icon
+            name={st === "done" ? "check" : "file"}
+            className={st === "done" ? "h-5 w-5 text-emerald-300" : "h-5 w-5"}
+          />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{meta.path ?? meta.name}</p>
+          <p className="truncate text-sm font-medium">
+            {meta.path ?? meta.name}
+          </p>
           <p className="flex items-center gap-1.5 text-xs text-white/45">
             {fileKind(meta.type, meta.name)} · {formatBytes(meta.size)}
             {st === "done" && state?.verified && (
-              <Tip tip={verifiedHelp} className="inline-flex items-center gap-1 text-emerald-300/80">
+              <Tip
+                tip={verifiedHelp}
+                className="inline-flex items-center gap-1 text-emerald-300/80"
+              >
                 · <Icon name="shield" className="h-3 w-3" /> Verified
               </Tip>
             )}
-            {st === "error" && <span className="text-rose-300">· {state?.error}</span>}
+            {st === "error" && (
+              <span className="text-rose-300">· {state?.error}</span>
+            )}
           </p>
         </div>
         {(st === "idle" || st === "error" || st === "cancelled") && (
-          <button className="icon-btn" disabled={disabled} onClick={onDownload} aria-label={`Download ${meta.name}`}>
+          <button
+            className="icon-btn"
+            disabled={disabled}
+            onClick={onDownload}
+            aria-label={`Download ${meta.name}`}
+          >
             <Icon name="download" />
           </button>
         )}
         {(st === "queued" || st === "receiving") && (
-          <button className="icon-btn" onClick={onCancel} aria-label={`Cancel ${meta.name}`}>
+          <button
+            className="icon-btn"
+            onClick={onCancel}
+            aria-label={`Cancel ${meta.name}`}
+          >
             <Icon name="x" className="h-4 w-4" />
           </button>
         )}
         {st === "verifying" && <Spinner />}
         {st === "done" && state?.file && (isIOS || state.file.size > 0) && (
-          <button className="btn-ghost px-3 py-1.5 text-xs" onClick={() => shareOrDownload(state.file!)}>
+          <button
+            className="btn-ghost px-3 py-1.5 text-xs"
+            onClick={() => shareOrDownload(state.file!)}
+          >
             Save
           </button>
         )}

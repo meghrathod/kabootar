@@ -41,7 +41,12 @@ export class Directory extends DurableObject<Env> {
   }
 
   /** Fixed-window limiter keyed by bucket and client. */
-  allow(bucket: string, client: string, limit: number, windowMs = 60_000): boolean {
+  allow(
+    bucket: string,
+    client: string,
+    limit: number,
+    windowMs = 60_000,
+  ): boolean {
     const key = `${bucket}:${client}`;
     const now = Date.now();
     let b = this.buckets.get(key);
@@ -50,7 +55,8 @@ export class Directory extends DurableObject<Env> {
       this.buckets.set(key, b);
     }
     if (this.buckets.size > 50_000) {
-      for (const [k, v] of this.buckets) if (now >= v.reset) this.buckets.delete(k);
+      for (const [k, v] of this.buckets)
+        if (now >= v.reset) this.buckets.delete(k);
     }
     return ++b.count <= limit;
   }
@@ -60,7 +66,9 @@ export class Directory extends DurableObject<Env> {
     if (validPIN(preferred)) {
       const existing = await this.ctx.storage.get<PinEntry>(`pin:${preferred}`);
       if (!existing || existing.info.id === info.id) {
-        await this.ctx.storage.put(`pin:${preferred}`, { info } satisfies PinEntry);
+        await this.ctx.storage.put(`pin:${preferred}`, {
+          info,
+        } satisfies PinEntry);
         return preferred;
       }
     }
@@ -82,7 +90,11 @@ export class Directory extends DurableObject<Env> {
    * Exchange a PIN for its room. PINs are only six digits, so guesses are
    * throttled hard per client address.
    */
-  async lookup(pin: string, roomId: string | undefined, client: string): Promise<RoomInfo | "rate_limited" | null> {
+  async lookup(
+    pin: string,
+    roomId: string | undefined,
+    client: string,
+  ): Promise<RoomInfo | "rate_limited" | null> {
     if (!this.allow("join", client, 12)) return "rate_limited";
     if (!validPIN(pin)) return null;
     const entry = await this.ctx.storage.get<PinEntry>(`pin:${pin}`);
@@ -115,7 +127,10 @@ export class Directory extends DurableObject<Env> {
   async withdraw(roomId: string): Promise<void> {
     const keys = await this.ctx.storage.get<string[]>(`room:${roomId}`);
     if (!keys) return;
-    await this.ctx.storage.delete([`room:${roomId}`, ...keys.map((k) => `net:${k}:${roomId}`)]);
+    await this.ctx.storage.delete([
+      `room:${roomId}`,
+      ...keys.map((k) => `net:${k}:${roomId}`),
+    ]);
     const msg = JSON.stringify({ t: "remove", id: roomId });
     const sent = new Set<WebSocket>();
     for (const k of keys) {
@@ -129,18 +144,28 @@ export class Directory extends DurableObject<Env> {
 
   /** Discovery websocket. The entry worker passes the client's network keys. */
   async fetch(request: Request): Promise<Response> {
-    const keys = JSON.parse(request.headers.get("X-Discovery-Keys") ?? "[]") as string[];
+    const keys = JSON.parse(
+      request.headers.get("X-Discovery-Keys") ?? "[]",
+    ) as string[];
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     // Tags let announce/withdraw find watchers by network.
     this.ctx.acceptWebSocket(server, keys.slice(0, 4));
     // Tell the client which networks it is matched on (diagnostics), and
     // whether a privacy relay hides its network entirely.
-    server.send(JSON.stringify({ t: "network", keys, hidden: request.headers.get("X-Network-Hidden") === "1" }));
+    server.send(
+      JSON.stringify({
+        t: "network",
+        keys,
+        hidden: request.headers.get("X-Network-Hidden") === "1",
+      }),
+    );
 
     const seen = new Set<string>();
     for (const k of keys) {
-      const rooms = await this.ctx.storage.list<RoomInfo>({ prefix: `net:${k}:` });
+      const rooms = await this.ctx.storage.list<RoomInfo>({
+        prefix: `net:${k}:`,
+      });
       for (const info of rooms.values()) {
         if (seen.has(info.id)) continue;
         seen.add(info.id);

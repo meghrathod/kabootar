@@ -8,13 +8,22 @@ function key(f: { file: File; path?: string }) {
   return `${f.path ?? f.file.name}:${f.file.size}:${f.file.lastModified}`;
 }
 
-export function addFiles(files: Iterable<File | { file: File; path?: string }>) {
+export function addFiles(
+  files: Iterable<File | { file: File; path?: string }>,
+) {
   const incoming = [...files].map((f) =>
-    f instanceof File ? { file: f, path: f.webkitRelativePath || undefined } : f,
+    f instanceof File
+      ? { file: f, path: f.webkitRelativePath || undefined }
+      : f,
   );
   draft.set((d) => {
     const seen = new Set(d.files.map(key));
-    return { files: [...d.files, ...incoming.filter((f) => !seen.has(key(f)) && seen.add(key(f)))] };
+    return {
+      files: [
+        ...d.files,
+        ...incoming.filter((f) => !seen.has(key(f)) && seen.add(key(f))),
+      ],
+    };
   });
 }
 
@@ -36,7 +45,9 @@ export function clearDraft() {
 }
 
 /** Expand dropped folders (Chromium, Safari and Firefox support webkitGetAsEntry). */
-export async function filesFromDataTransfer(dt: DataTransfer): Promise<{ file: File; path?: string }[]> {
+export async function filesFromDataTransfer(
+  dt: DataTransfer,
+): Promise<{ file: File; path?: string }[]> {
   const entries = [...dt.items]
     .filter((i) => i.kind === "file")
     .map((i) => i.webkitGetAsEntry?.())
@@ -44,15 +55,22 @@ export async function filesFromDataTransfer(dt: DataTransfer): Promise<{ file: F
   if (entries.length === 0) return [...dt.files].map((file) => ({ file }));
 
   const out: { file: File; path?: string }[] = [];
-  const walk = async (entry: FileSystemEntry, prefix: string): Promise<void> => {
+  const walk = async (
+    entry: FileSystemEntry,
+    prefix: string,
+  ): Promise<void> => {
     if (entry.isFile) {
-      const file = await new Promise<File>((res, rej) => (entry as FileSystemFileEntry).file(res, rej));
+      const file = await new Promise<File>((res, rej) =>
+        (entry as FileSystemFileEntry).file(res, rej),
+      );
       out.push({ file, path: prefix ? `${prefix}/${file.name}` : undefined });
     } else if (entry.isDirectory) {
       const reader = (entry as FileSystemDirectoryEntry).createReader();
       const dir = prefix ? `${prefix}/${entry.name}` : entry.name;
       for (;;) {
-        const batch = await new Promise<FileSystemEntry[]>((res, rej) => reader.readEntries(res, rej));
+        const batch = await new Promise<FileSystemEntry[]>((res, rej) =>
+          reader.readEntries(res, rej),
+        );
         if (batch.length === 0) break;
         for (const e of batch) await walk(e, dir);
       }

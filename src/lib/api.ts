@@ -43,16 +43,31 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-export function createRoom(discoverable: boolean, ip?: { v4?: string; v6?: string }) {
-  return post<CreatedRoom>("/api/rooms", { discoverable, ip: ip?.v4 ?? "", ip6: ip?.v6 ?? "" });
+export function createRoom(
+  discoverable: boolean,
+  ip?: { v4?: string; v6?: string },
+) {
+  return post<CreatedRoom>("/api/rooms", {
+    discoverable,
+    ip: ip?.v4 ?? "",
+    ip6: ip?.v6 ?? "",
+  });
 }
 
 export function joinWithPin(pin: string, roomId?: string) {
-  return post<{ room: RoomInfo; clientKey: string }>("/api/join", { pin, roomId: roomId ?? "" });
+  return post<{ room: RoomInfo; clientKey: string }>("/api/join", {
+    pin,
+    roomId: roomId ?? "",
+  });
 }
 
 export function errorMessage(err: unknown): string {
-  const code = err instanceof ApiError ? err.code : err instanceof Error ? err.message : String(err);
+  const code =
+    err instanceof ApiError
+      ? err.code
+      : err instanceof Error
+        ? err.message
+        : String(err);
   switch (code) {
     case "offline":
       return "Can't reach the Kabootar server. Check your connection.";
