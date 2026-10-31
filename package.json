@@ -2,6 +2,7 @@
   "name": "kabootar",
   "version": "2.0.0",
   "description": "Peer-to-peer file sharing PWA",
+  "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "vite",
     "dev:worker": "wrangler dev --port 8787",
