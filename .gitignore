@@ -1,3 +1,8 @@
 node_modules
 dist
 .DS_Store
+# Cloudflare
+.wrangler/
+.dev.vars
+test-results/
+playwright-report/

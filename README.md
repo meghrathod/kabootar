@@ -1,85 +1,54 @@
-# Kabootar: File Sharing made Simple
+# Kabootar
 
-## What is Kabootar?
+Peer-to-peer file sharing in the browser. Files go straight from one device to another over an encrypted WebRTC data channel, so nothing is uploaded to a server and there's no size limit beyond the receiver's disk.
 
-Do you remember SHAREit? We all do🙃! Well, what if we told you that we made it
-lighter, faster and easier to use? With Kabootar, now you can share all your
-files with your friends and family in a jiffy.
+> *Kabootar* (कबूतर) is Hindi for pigeon, after the carrier pigeons that once delivered messages.
 
-Using Kabootar's peer-to-peer framework, we can now share files securely and
-privately without the need for any third-party servers. Kabootar is
-cross-platform and works on any device without any downloads.
+- **Send** files, folders or text; receivers open a link, scan a QR code or type a 6-digit code.
+- **Nearby**: devices on the same network see each other's shares.
+- **Large files**: streamed to disk (File System Access API on desktop Chromium, a service-worker download on Android/Firefox, private storage on Safari/iOS).
+- **Resumable**: transfers survive network hiccups (ICE restart) and reconnects (resume from the last byte).
+- **Verified**: every file is checked with SHA-256 after transfer.
+- **Installable PWA**: works offline, and on Android it appears in the system share sheet.
+## How it works
 
-> The name "Kabootar" comes from an ancient practise of sending messages to
-> designated people using specially trained pigeons.
+The app and its signalling run on Cloudflare: a Worker serves the PWA and API, one Durable Object per share relays WebRTC offers and answers, and Cloudflare Realtime TURN relays traffic when a direct connection isn't possible. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## How to use Kabootar?
+## Development
 
-1. The sender goes to the Kabootar homepage and selects the file to be shared.
-2. Kabootar generates a unique link for the file.
-3. The link is then shared with the receiver.
-4. The receiver clicks on the link and the file is downloaded.
+Requires Node 24 and Yarn 1.
 
-## Why not XYZ?
+```sh
+yarn install
+yarn build          # the worker serves dist/, so build once first
+yarn dev:worker     # Worker + Durable Objects locally on :8787
+yarn dev            # app with hot reload on http://localhost:3000
+```
 
-- **SHAREit/Wi-Fi Direct/Nearby Share/AirDrop**: SHAREit was a great app but it
-  requires a direct Wi-Fi connection/Bluetooth and hence devices need to be in a
-  closed vicinity. Kabootar is a peer-to-peer framework that will transfer files
-  through a local network if the device is connected to the same network or uses
-  the internet otherwise.
+Or run the production build locally: `yarn preview` (http://localhost:8080).
 
-- **Google Drive/OneDrive/Dropbox**: Google Drive and other cloud services are
-  great but they rely on third-party servers and their transfer speeds while
-  Kabootar is a P2P framework.
+Local secrets live in `.dev.vars` (git-ignored):
 
-## How does it work?
+```
+SERVER_SECRET=anything-for-local-dev
+```
 
-Kabootar uses a peer-to-peer framework to transfer files. The sender generates a
-unique link for the file and shares it with the receiver. The receiver clicks on
-the link and the file is downloaded. Kabootar uses WebRTC to transfer files.
+Testing on a phone needs HTTPS (service workers, clipboard and private storage are disabled on plain-HTTP LAN addresses). A free tunnel works: `cloudflared tunnel --url http://localhost:8080`.
 
-## How are peers discovered?
+### Tests
 
-- In a P2P file sharing system, peers need to be able to find each other before
-  they can send files. To do this we need to have a way to identify peers. A
-  signaling server is a server that can be used to exchange this information.
-- Signaling server listens to requests for creating rooms and adding peers to
-  rooms. Once a room has been created, whenever a client goes to the file
-  sharing link a `GET` request is made to the `/ws/:room_id` route with the
-  `mKey` for a master or `cKey` for a client as query parameters. If the room
-  exists, the client is added to the room and a WebSocket connection is
-  established with the client.
+```sh
+yarn typecheck
+yarn test          # transfer engine: multi-file, resume, integrity, backpressure
+yarn test:worker   # signalling worker inside workerd with real Durable Objects
+yarn test:e2e      # two browsers doing a real WebRTC transfer (needs `yarn build`)
+```
 
-## How are files transferred?
+## Deployment
 
-- Files are transferred using the WebRTC protocol. WebRTC is an open standard
-  that provides web browsers and mobile applications with Real-Time
-  Communications (RTC) capabilities via simple APIs. The WebRTC components have
-  been optimized to best serve this purpose.
-- WebRTC protocol is inherently secure and uses encryption to transfer files. It
-  also uses ICE to find the best route to transfer files. This makes our file
-  transfer secure, fast and reliable.
+`yarn deploy` after a one-time setup; CI deploys every push to `develop`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-## How to run?
 
-### Rendezvous
+## License
 
-Inside the `signalling` directory:
-
-1. `mkdir out`
-1. `go build -o out/rendezvous ./cmd/signalling`
-1. Copy the `kabootar.example.toml` to `kabootar.toml` and modify the
-   configuration values inside it
-1. `./out/rendezvous`
-
-### Web-app
-
-1. Modify the `src/config.ts` to change the `baseURL` to `http://localhost:3000`
-   and flip `secure` to `false`
-1. Run `yarn install --frozen-lockfile`
-1. Run `yarn dev`
-
-## People
-
-- Akshit Garg
-- Megh Rathod
+[MIT](LICENSE)
