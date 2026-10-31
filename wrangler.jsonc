@@ -6,6 +6,10 @@
   "workers_dev": true,
   "observability": { "enabled": true },
 
+  // Cloudflare creates the DNS record and certificate for a custom domain.
+  // The workers.dev URL stays enabled so existing share links keep working.
+  "routes": [{ "pattern": "kabootar.meghrathod.dev", "custom_domain": true }],
+
   // The PWA built by Vite. Unknown paths fall back to index.html; API and
   // websocket paths go to the worker first.
   "assets": {
@@ -34,7 +38,4 @@
   //   SERVER_SECRET       required: derives room keys
   //   CF_TURN_KEY_ID      optional: Cloudflare Realtime TURN key id
   //   CF_TURN_API_TOKEN   optional: Cloudflare Realtime TURN API token
-  //
-  // Custom domain, e.g.:
-  // "routes": [{ "pattern": "kabootar.example.com", "custom_domain": true }]
 }
