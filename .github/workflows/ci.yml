@@ -22,11 +22,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Yarn 4 comes from the packageManager field via Corepack; enable it
+      # before setup-node so the yarn cache lookup uses the right version.
+      - run: corepack enable
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: yarn
-      - run: yarn install --frozen-lockfile
+      - run: yarn install --immutable
       - run: yarn typecheck
       - run: yarn test
       - run: yarn build
@@ -39,11 +42,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Yarn 4 comes from the packageManager field via Corepack; enable it
+      # before setup-node so the yarn cache lookup uses the right version.
+      - run: corepack enable
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: yarn
-      - run: yarn install --frozen-lockfile
+      - run: yarn install --immutable
       - run: yarn build
       - run: npx playwright install --with-deps chromium
       - run: yarn test:e2e

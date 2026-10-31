@@ -17,7 +17,7 @@ The app and its signalling run on Cloudflare: a Worker serves the PWA and API, o
 
 ## Development
 
-Requires Node 24 and Yarn 1.
+Requires Node 24 and Yarn 4 (run `corepack enable` once; the version comes from `packageManager` in `package.json`).
 
 ```sh
 yarn install
