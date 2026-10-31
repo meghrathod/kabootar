@@ -63,6 +63,8 @@ interface Download {
   accepting: boolean;
   chain: Promise<void>;
   failed: boolean;
+  /** A finish is in progress; a duplicate "end" (e.g. after a resync) must not run it twice. */
+  finishing: boolean;
 }
 
 /**
@@ -195,7 +197,9 @@ export class ItemClient {
       case "end": {
         const d = this.active;
         if (!d || d.meta.id !== msg.id) return;
-        void this.finish(d, typeof msg.sha256 === "string" ? msg.sha256 : "");
+        this.finish(d, typeof msg.sha256 === "string" ? msg.sha256 : "").catch((err) =>
+          this.fail(d, err instanceof Error ? err.message : "Could not finish the file"),
+        );
         break;
       }
       case "error": {
@@ -243,6 +247,7 @@ export class ItemClient {
       accepting: false,
       chain: Promise.resolve(),
       failed: false,
+      finishing: false,
       ready: false,
     };
     this.active = d;
@@ -326,11 +331,14 @@ export class ItemClient {
   }
 
   private async finish(d: Download, expected: string) {
+    if (d.finishing) return;
+    d.finishing = true;
     await d.chain;
     if (d.failed || this.active !== d) return;
 
     if (d.received !== d.meta.size) {
       // Missed bytes (e.g. a reconnect raced with the end); ask again.
+      d.finishing = false;
       d.accepting = false;
       this.send({ t: "get", id: d.meta.id, offset: d.received });
       return;

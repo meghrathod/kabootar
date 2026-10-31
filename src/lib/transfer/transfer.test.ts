@@ -269,6 +269,26 @@ describe("transfer", () => {
     );
   });
 
+  it("finishes once when the end message arrives twice", async () => {
+    // After a resync the sender can send "end" again; finishing twice used
+    // to finalize the hash twice and throw.
+    const file = randomFile(2 * MiB, "twice.bin");
+    const states = new Map<number, ItemState>();
+    const client = new ItemClient({ onState: (id, st) => states.set(id, st) });
+    const { a } = connect(share([file]), client);
+    const send = a.send.bind(a);
+    a.send = (data) => {
+      send(data);
+      if (typeof data === "string" && data.includes('"t":"end"')) send(data);
+    };
+    await waitFor(() => client.items.length === 1);
+    const sink = new MemorySink(1);
+    client.download(0, sink);
+    await waitFor(() => states.get(0)?.status === "done");
+    await new Promise((r) => setTimeout(r, 50));
+    expect(states.get(0)).toMatchObject({ status: "done", verified: true });
+  });
+
   it("detects corruption", async () => {
     const file = randomFile(1 * MiB, "c.bin");
     const states = new Map<number, ItemState>();
