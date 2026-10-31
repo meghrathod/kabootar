@@ -49,15 +49,9 @@ and run `yarn deploy` again.
 
 Deploys are done by Cloudflare's GitHub integration (Workers Builds), so no API token is stored in GitHub. `.github/workflows/ci.yml` only runs typechecks, unit tests, worker tests and the end-to-end suite on every push and pull request.
 
-Connect the repository once in the dashboard: **Workers & Pages → kabootar → Settings → Builds → Connect** (pick this repository), then set:
+Connect the repository once in the dashboard: **Workers & Pages → kabootar → Settings → Builds → Connect** (pick this repository) and set the production branch to `develop`. The default build settings work: `wrangler deploy` runs `yarn build` itself (the `build` field in `wrangler.jsonc`), and `.node-version` pins Node 24 to match CI. Optionally, set the deploy command to `npx wrangler deploy --var VERSION:$WORKERS_CI_COMMIT_SHA` so `/healthz` reports the deployed commit.
 
-| Setting           | Value                                                      |
-| ----------------- | ---------------------------------------------------------- |
-| Production branch | `develop`                                                  |
-| Build command     | `yarn build`                                               |
-| Deploy command    | `npx wrangler deploy --var VERSION:$WORKERS_CI_COMMIT_SHA` |
-
-Every push to `develop` is then built and deployed by Cloudflare and reported back as a check on the commit. It runs alongside GitHub Actions CI, not after it, so a push that fails CI is still deployed.
+Every push to `develop` is then built and deployed by Cloudflare and reported back as a **Workers Builds** check on the commit; the full build log is linked from that check. It runs alongside GitHub Actions CI, not after it, so a push that fails CI is still deployed.
 
 Worker secrets (`SERVER_SECRET`, TURN keys) are stored in Cloudflare, not GitHub; set them once as above.
 

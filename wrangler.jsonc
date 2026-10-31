@@ -10,6 +10,13 @@
   // The workers.dev URL stays enabled so existing share links keep working.
   "routes": [{ "pattern": "kabootar.meghrathod.dev", "custom_domain": true }],
 
+  // Build the PWA before every deploy, so a plain `wrangler deploy` (as run
+  // by Cloudflare's GitHub integration) never ships without ./dist.
+  "build": {
+    "command": "yarn build",
+    "watch_dir": ["src", "public", "index.html"]
+  },
+
   // The PWA built by Vite. Unknown paths fall back to index.html; API and
   // websocket paths go to the worker first.
   "assets": {

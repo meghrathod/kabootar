@@ -7,7 +7,7 @@
     "dev:worker": "wrangler dev --port 8787",
     "build": "vite build",
     "preview": "vite build && wrangler dev --port 8080",
-    "deploy": "vite build && wrangler deploy",
+    "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sw.json && tsc --noEmit -p tsconfig.worker.json",
     "test": "vitest run",
     "test:worker": "vitest run -c vitest.worker.config.ts",
