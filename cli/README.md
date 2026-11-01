@@ -30,6 +30,16 @@ Other options:
 
 Each binary is a single static file for linux (amd64, arm64, armv7), macOS (Intel, Apple Silicon) and Windows (amd64, arm64).
 
+### Updating
+
+```sh
+kabootar update
+```
+
+This downloads the latest release, checks it against the release's SHA-256 checksums, makes sure the new binary runs, and only then replaces the current one. Copies installed by Homebrew or a `.deb`/`.rpm` package are left to their package manager, and `update` tells you the command to use instead (`brew upgrade --cask kabootar`, or the new package from Releases).
+
+When a newer version is out, kabootar mentions it at most once a day. The check runs in the background, so it never slows a command down, and it only happens on an interactive terminal. Set `KABOOTAR_NO_UPDATE_CHECK=1` to turn it off. It's also off in CI.
+
 ## Use
 
 ```sh
@@ -60,6 +70,8 @@ Received files go to the current folder (or `-o DIR`). Existing files are never 
 
 Exit codes: `0` when everything arrived (or the share ended normally), `1` on errors, `130` when interrupted.
 
+On a terminal, the progress area updates in place rather than adding lines: one line per receiver when sending; the files (done, active, up next) when receiving. Each connection line shows the route and the address pair it uses, for example `direct · same network (192.168.1.5 ↔ 192.168.1.9, host/host udp)`. When the output is piped or logged, the same events are printed as plain lines instead.
+
 The animated pigeon only appears on an interactive terminal that's big enough. It turns off with `--no-art` or `NO_COLOR=1`. Run `kabootar demo` to see it.
 
 ## How it compares with scp
@@ -74,4 +86,5 @@ The server only introduces the two machines. Files then go directly between them
 ## Troubleshooting
 
 - `KABOOTAR_DEBUG=1` prints WebRTC (Pion) logs.
+- Slow on your own network? Check the route on the connected line. `same network` is the LAN. `peer-to-peer` with public addresses, or `relayed`, means the traffic is leaving your network (for example through a VPN or the router's public address).
 - "Couldn't establish a connection": both networks block direct connections and no relay was available. Try another network.

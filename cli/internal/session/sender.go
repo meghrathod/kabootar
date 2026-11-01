@@ -6,11 +6,8 @@ package session
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"io"
-	"os"
 	"sync"
 	"time"
 
@@ -44,6 +41,8 @@ type PeerView struct {
 	N     int // 1-based, in order of arrival
 	State string
 	Route string
+	// Addrs is the local and remote address the connection uses.
+	Addrs string
 	// Current is the item being sent, with bytes acknowledged.
 	Current   int
 	HasCur    bool
@@ -85,14 +84,7 @@ type Sender struct {
 	ended      bool
 	done       chan struct{}
 
-	hashMu sync.Mutex
-	hashes map[int]*hashJob
-}
-
-type hashJob struct {
-	once sync.Once
-	sum  string
-	err  error
+	hashes *hashCache
 }
 
 // StartSender creates the room and starts accepting receivers.
@@ -110,7 +102,7 @@ func StartSender(ctx context.Context, items []transfer.ShareItem, opts SenderOpt
 		numbers:    map[string]int{},
 		iceServers: rtc.FallbackICEServers,
 		done:       make(chan struct{}),
-		hashes:     map[int]*hashJob{},
+		hashes:     &hashCache{m: map[int]string{}},
 	}
 	s.sig = signal.New(opts.API.WSBase(), created.ID, opts.UserAgent, s.auth, signal.Handlers{
 		OnStatus:  func(st signal.Status) { s.emit(SenderEvent{Type: "status", Signal: st}) },
@@ -265,30 +257,24 @@ func (s *Sender) addLink(peer string) {
 	l.start()
 }
 
-// hash returns a file's SHA-256, computed once and shared by all receivers.
-func (s *Sender) hash(item transfer.ShareItem) (string, error) {
-	s.hashMu.Lock()
-	j := s.hashes[item.Meta.ID]
-	if j == nil {
-		j = &hashJob{}
-		s.hashes[item.Meta.ID] = j
-	}
-	s.hashMu.Unlock()
-	j.once.Do(func() {
-		f, err := os.Open(item.Path)
-		if err != nil {
-			j.err = err
-			return
-		}
-		defer f.Close()
-		h := sha256.New()
-		if _, err := io.Copy(h, f); err != nil {
-			j.err = err
-			return
-		}
-		j.sum = hex.EncodeToString(h.Sum(nil))
-	})
-	return j.sum, j.err
+// hashCache shares finished file hashes between receivers; each transfer
+// hashes the file as it reads it, so it's only read once.
+type hashCache struct {
+	mu sync.Mutex
+	m  map[int]string
+}
+
+func (h *hashCache) Get(id int) (string, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	sum, ok := h.m[id]
+	return sum, ok
+}
+
+func (h *hashCache) Put(id int, sum string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.m[id] = sum
 }
 
 // End stops sharing and tells receivers.
@@ -394,7 +380,8 @@ func (l *senderLink) start() {
 			l.restarts = 0
 			l.mu.Unlock()
 			if route := rtc.Route(pc); route != "" {
-				l.update(func(v *PeerView) { v.Route = route })
+				addrs := rtc.Addrs(pc)
+				l.update(func(v *PeerView) { v.Route, v.Addrs = route, addrs })
 			}
 		}
 	})
@@ -555,7 +542,7 @@ func (l *senderLink) onOpen() {
 	chunk := protocol.ChunkSize(l.pc.SCTP().GetCapabilities().MaxMessageSize)
 	srv := transfer.NewServer(rtc.DataChannel{DataChannel: l.dc}, l.s.Items, transfer.ServerOptions{
 		ChunkSize: chunk,
-		Hash:      l.s.hash,
+		Hashes:    l.s.hashes,
 		OnEvent:   l.onServerEvent,
 	})
 	l.mu.Lock()

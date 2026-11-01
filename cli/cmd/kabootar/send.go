@@ -56,7 +56,7 @@ func cmdSend(ctx context.Context, args []string, stderr io.Writer) int {
 	}
 
 	client := api.New(*server, userAgent())
-	st := &sendState{t: t, items: items, meters: map[string]*ui.Meter{}, last: map[string]string{}, complete: make(chan struct{})}
+	st := newSendState(t, items)
 	s, err := session.StartSender(ctx, items, session.SenderOptions{
 		API:          client,
 		UserAgent:    userAgent(),
@@ -73,22 +73,19 @@ func cmdSend(ctx context.Context, args []string, stderr io.Writer) int {
 
 	select {
 	case <-ctx.Done():
-		t.Status("")
-		t.Printf("Stopping the share…")
+		st.setNote("Stopped sharing.")
 		s.End()
 		return 130
 	case <-s.Done():
-		t.Status("")
 		if st.failed != "" {
-			fmt.Fprintf(stderr, "kabootar: %s\n", st.failed)
 			return 1
 		}
-		t.Printf("The share has ended.")
+		st.setNote("The share has ended.")
 		return 0
 	case <-st.onceDone(*once):
 		// Give the last messages a moment to reach the receiver.
 		time.Sleep(time.Second)
-		t.Status("")
+		st.setNote("Delivered; stopped sharing.")
 		s.End()
 		return 0
 	}
@@ -173,11 +170,41 @@ type sendState struct {
 	items []transfer.ShareItem
 
 	mu       sync.Mutex
-	meters   map[string]*ui.Meter
-	last     map[string]string
+	peers    map[string]*peerRow
+	order    []string
+	note     string
+	ended    string
 	failed   string
 	complete chan struct{}
 	closed   bool
+}
+
+// peerRow is one receiver as shown in the live view.
+type peerRow struct {
+	view  session.PeerView
+	meter ui.Meter
+	speed float64
+}
+
+func newSendState(t *ui.Term, items []transfer.ShareItem) *sendState {
+	st := &sendState{t: t, items: items, peers: map[string]*peerRow{}, complete: make(chan struct{})}
+	t.SetView(st.view)
+	return st
+}
+
+// log prints an event line when output isn't redrawn in place; on a
+// terminal the live view shows the same thing.
+func (st *sendState) log(format string, a ...any) {
+	if !st.t.Live() {
+		st.t.Printf(format, a...)
+	}
+}
+
+func (st *sendState) setNote(format string, a ...any) {
+	st.mu.Lock()
+	st.note = fmt.Sprintf(format, a...)
+	st.mu.Unlock()
+	st.log(format, a...)
 }
 
 func (st *sendState) onceDone(enabled bool) <-chan struct{} {
@@ -197,16 +224,21 @@ func (st *sendState) files() (n int, total int64) {
 	return n, total
 }
 
-func (st *sendState) name(id int) string {
+func (st *sendState) item(id int) protocol.Item {
 	for _, it := range st.items {
 		if it.Meta.ID == id {
-			if it.Meta.Path != "" {
-				return it.Meta.Path
-			}
-			return it.Meta.Name
+			return it.Meta
 		}
 	}
-	return fmt.Sprintf("item %d", id)
+	return protocol.Item{Name: fmt.Sprintf("item %d", id)}
+}
+
+func (st *sendState) name(id int) string {
+	it := st.item(id)
+	if it.Path != "" {
+		return it.Path
+	}
+	return it.Name
 }
 
 func (st *sendState) printHeader(s *session.Sender, qr bool) {
@@ -238,7 +270,9 @@ func (st *sendState) printHeader(s *session.Sender, qr bool) {
 	if s.Created.Hidden {
 		st.t.Printf("Note: a VPN or privacy relay hides this network, so the share isn't listed for nearby devices.")
 	}
-	st.t.Printf("Waiting for receivers… (Ctrl-C to stop sharing)\n")
+	if !st.t.Live() {
+		st.t.Printf("Waiting for receivers… (Ctrl-C to stop sharing)\n")
+	}
 }
 
 // qrLines renders a QR code with half blocks, two modules per character
@@ -271,22 +305,27 @@ func (st *sendState) onEvent(e session.SenderEvent) {
 	case "peer":
 		st.onPeer(e.Peer)
 	case "delivered":
-		st.t.Printf("Receiver %d ✓ %s", e.Peer.N, st.name(e.Item))
+		st.onPeer(e.Peer)
+		st.log("Receiver %d ✓ %s", e.Peer.N, st.name(e.Item))
 		n, _ := st.files()
 		if len(e.Peer.Completed) >= n {
-			st.t.Status("")
-			st.t.Printf("Receiver %d has everything.", e.Peer.N)
+			st.log("Receiver %d has everything.", e.Peer.N)
 			st.markComplete()
 		}
 	case "status":
-		if e.Signal == "reconnecting" {
-			st.t.Printf("Lost the connection to the server; reconnecting… (transfers in progress continue)")
+		switch e.Signal {
+		case "reconnecting":
+			st.setNote("Lost the connection to the server; reconnecting… (transfers in progress continue)")
+		case "open":
+			st.mu.Lock()
+			st.note = ""
+			st.mu.Unlock()
 		}
 	case "error":
 		st.mu.Lock()
 		st.failed = e.Message
 		st.mu.Unlock()
-		st.t.Printf("%s", e.Message)
+		st.setNote("%s", e.Message)
 	}
 }
 
@@ -299,61 +338,132 @@ func (st *sendState) markComplete() {
 	}
 }
 
+func routeText(route, addrs string) string {
+	r := rtc.RouteLabel[route]
+	if r == "" {
+		r = "peer-to-peer"
+	}
+	if addrs != "" {
+		r += " (" + addrs + ")"
+	}
+	return r
+}
+
 func (st *sendState) onPeer(p session.PeerView) {
 	st.mu.Lock()
-	prev := st.last[p.ID]
-	st.last[p.ID] = p.State
-	m := st.meters[p.ID]
-	if m == nil {
-		m = &ui.Meter{}
-		st.meters[p.ID] = m
+	row := st.peers[p.ID]
+	if row == nil {
+		row = &peerRow{}
+		st.peers[p.ID] = row
+		st.order = append(st.order, p.ID)
 	}
+	prev := row.view.State
+	row.view = p
+	if p.State != prev && p.State == session.PeerConnected {
+		row.meter.Reset(p.BytesDone)
+	}
+	if p.State == session.PeerConnected && p.HasCur {
+		row.speed = row.meter.Sample(p.BytesDone)
+	} else if !p.HasCur {
+		row.speed = 0
+	}
+	speed := row.speed
 	st.mu.Unlock()
 
+	n, total := st.files()
 	if p.State != prev {
 		switch p.State {
 		case session.PeerConnected:
-			route := rtc.RouteLabel[p.Route]
-			if route == "" {
-				route = "peer-to-peer"
-			}
-			st.t.Printf("Receiver %d connected · %s", p.N, route)
-			m.Reset(p.BytesDone)
-			n, _ := st.files()
+			st.log("Receiver %d connected · %s", p.N, routeText(p.Route, p.Addrs))
 			if n == 0 {
 				// Text only: delivered as soon as the receiver has the list.
 				st.markComplete()
 			}
 		case session.PeerReconnecting:
-			st.t.Printf("Receiver %d: connection interrupted, reconnecting…", p.N)
+			st.log("Receiver %d: connection interrupted, reconnecting…", p.N)
 		case session.PeerFailed:
-			st.t.Status("")
-			st.t.Printf("Receiver %d: connection failed", p.N)
+			st.log("Receiver %d: connection failed", p.N)
 		case session.PeerLeft:
 			if prev != "" {
-				st.t.Status("")
-				st.t.Printf("Receiver %d left", p.N)
+				st.log("Receiver %d left", p.N)
 			}
 		}
 	}
 	if p.State == session.PeerConnected && p.HasCur {
-		size := int64(0)
-		for _, it := range st.items {
-			if it.Meta.ID == p.Current {
-				size = it.Meta.Size
-			}
-		}
-		speed := m.Sample(p.BytesDone)
-		pct := 100.0
-		if size > 0 {
-			pct = float64(p.Acked) * 100 / float64(size)
-		}
-		_, total := st.files()
 		frac := 1.0
 		if total > 0 {
 			frac = float64(p.BytesDone) / float64(total)
 		}
 		st.t.Progress(frac, speed)
-		st.t.Status(fmt.Sprintf("↑ Receiver %d  %s  %s %3.0f%%  %s", p.N, st.name(p.Current), ui.Bar(p.Acked, size, 20), pct, ui.Speed(speed)))
+		left := ""
+		if speed > 0 {
+			left = " · " + ui.Duration(time.Duration(float64(total-p.BytesDone)/speed*float64(time.Second))) + " left"
+		}
+		st.t.Status(fmt.Sprintf("↑ %s %3.0f%%  %s / %s  %s%s", ui.Bar(p.BytesDone, total, 24),
+			pct(p.BytesDone, total), ui.Bytes(p.BytesDone), ui.Bytes(total), ui.Speed(speed), left))
+	} else if !st.anyActive() {
+		st.t.Status("")
 	}
+}
+
+func (st *sendState) anyActive() bool {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	for _, r := range st.peers {
+		if r.view.State == session.PeerConnected && r.view.HasCur {
+			return true
+		}
+	}
+	return false
+}
+
+func pct(done, total int64) float64 {
+	if total <= 0 {
+		return 100
+	}
+	return float64(done) * 100 / float64(total)
+}
+
+// view is the live block: one line per receiver, redrawn in place.
+func (st *sendState) view() []string {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	n, _ := st.files()
+	var lines []string
+	if len(st.order) == 0 {
+		lines = append(lines, "Waiting for receivers… (Ctrl-C to stop sharing)")
+	}
+	for _, id := range st.order {
+		r := st.peers[id]
+		p := r.view
+		var state string
+		switch p.State {
+		case session.PeerConnecting:
+			state = "connecting…"
+		case session.PeerConnected:
+			state = routeText(p.Route, p.Addrs)
+		case session.PeerReconnecting:
+			state = "reconnecting…"
+		case session.PeerFailed:
+			state = "connection failed"
+		case session.PeerLeft:
+			state = "left"
+		}
+		line := fmt.Sprintf("Receiver %d  %s", p.N, state)
+		if n > 0 {
+			mark := " "
+			if len(p.Completed) >= n {
+				mark = "✓"
+			}
+			line = fmt.Sprintf("%s Receiver %d  %d/%d file%s  %s", mark, p.N, len(p.Completed), n, plural(n), state)
+		}
+		if p.State == session.PeerConnected && p.HasCur {
+			line += fmt.Sprintf("  ↑ %s %.0f%%", st.name(p.Current), pct(p.Acked, st.item(p.Current).Size))
+		}
+		lines = append(lines, line)
+	}
+	if st.note != "" {
+		lines = append(lines, st.note)
+	}
+	return lines
 }

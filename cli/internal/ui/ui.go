@@ -87,11 +87,13 @@ func (m *Meter) Sample(bytes int64) float64 {
 }
 
 // Term writes event lines and, on a terminal, keeps a live block below
-// them: the flying pigeon (while a transfer runs) and a status line.
+// them that's redrawn in place: the command's view (e.g. one line per
+// receiver), the flying pigeon while a transfer runs, and a status line.
 type Term struct {
 	mu     sync.Mutex
 	w      io.Writer
 	live   bool
+	view   func() []string
 	art    bool
 	size   func() (cols, rows int)
 	status string
@@ -149,14 +151,25 @@ func (t *Term) Printf(format string, a ...any) {
 	t.redraw()
 }
 
-// Status sets the status line; "" hides the live block.
+// Live reports whether output is redrawn in place.
+func (t *Term) Live() bool { return t.live }
+
+// SetView sets what the live block shows above the pigeon and status line.
+// fn is called on every redraw, with the terminal lock held, so it must
+// not call back into Term.
+func (t *Term) SetView(fn func() []string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.view = fn
+}
+
+// Status sets the status line; "" removes it and lands the pigeon.
 func (t *Term) Status(s string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.status = s
 	if s == "" {
 		t.moving = false
-		t.clear()
 	}
 }
 
@@ -167,12 +180,21 @@ func (t *Term) Progress(frac, speed float64) {
 	t.frac, t.speed, t.moving = frac, speed, true
 }
 
-// Close removes the live block and restores the cursor.
+// Close stops redrawing. The view's final state stays on screen as the
+// summary; the pigeon and status line go away.
 func (t *Term) Close() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.status = ""
-	t.clear()
+	if !t.live {
+		return
+	}
+	t.status, t.moving = "", false
+	t.redraw()
+	if t.drawn > 0 {
+		fmt.Fprint(t.w, "\n")
+	}
+	fmt.Fprint(t.w, "\033[?25h")
+	t.drawn, t.shown = 0, ""
 	t.live = false
 }
 
@@ -190,21 +212,40 @@ func (t *Term) redraw() {
 	if !t.live {
 		return
 	}
-	if t.status == "" {
-		t.clear()
-		return
-	}
 	cols, rows := 80, 24
 	if t.size != nil {
 		if c, r := t.size(); c > 0 && r > 0 {
 			cols, rows = c, r
 		}
 	}
-	var lines []string
-	if t.art && t.moving {
-		lines = t.pigeonLines(cols, rows)
+	var view []string
+	if t.view != nil {
+		view = t.view()
 	}
-	lines = append(lines, fit(t.status, cols-1))
+	var tail []string
+	if t.status != "" {
+		tail = append(tail, fit(t.status, cols-1))
+	}
+	// Never taller than the screen, or the lines that scrolled off can't
+	// be rewritten: the pigeon goes first, then the view is trimmed.
+	avail := rows - 1
+	if len(view)+len(tail) > avail {
+		view = view[:max(0, avail-len(tail))]
+	}
+	var art []string
+	if t.art && t.moving {
+		art = t.pigeonLines(cols, avail-len(view)-len(tail))
+	}
+	if len(view)+len(art)+len(tail) == 0 {
+		t.clear()
+		return
+	}
+	lines := make([]string, 0, len(view)+len(art)+len(tail))
+	for _, l := range view {
+		lines = append(lines, fit(l, cols-1))
+	}
+	lines = append(lines, art...)
+	lines = append(lines, tail...)
 	content := strings.Join(lines, "\n")
 	if t.drawn > 0 && content == t.shown {
 		return
@@ -234,12 +275,14 @@ const pigeonFrames = 12
 
 func (t *Term) pigeonLines(cols, rows int) []string {
 	size := 0
+	// rows is the room left in the live block once the view and status
+	// line are placed.
 	switch {
-	case rows >= 46 && cols >= 100:
+	case rows >= 24 && cols >= 100:
 		size = 24
-	case rows >= 36 && cols >= 80:
+	case rows >= 18 && cols >= 80:
 		size = 18
-	case rows >= 26 && cols >= 60:
+	case rows >= 12 && cols >= 60:
 		size = 12
 	}
 	if size == 0 {

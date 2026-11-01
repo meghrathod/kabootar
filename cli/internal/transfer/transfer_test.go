@@ -3,7 +3,6 @@ package transfer
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"os"
 	"path/filepath"
@@ -121,13 +120,26 @@ type conn struct {
 	server *Server
 }
 
-func hashFile(item ShareItem) (string, error) {
-	b, err := os.ReadFile(item.Path)
-	if err != nil {
-		return "", err
+// hashes is a HashCache for tests.
+type hashes struct {
+	mu sync.Mutex
+	m  map[int]string
+}
+
+func (h *hashes) Get(id int) (string, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	s, ok := h.m[id]
+	return s, ok
+}
+
+func (h *hashes) Put(id int, sum string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.m == nil {
+		h.m = map[int]string{}
 	}
-	sum := sha256.Sum256(b)
-	return hexString(sum[:]), nil
+	h.m[id] = sum
 }
 
 func hexString(b []byte) string {
@@ -145,7 +157,7 @@ func connect(items []ShareItem, client *Client, chunk int, setup ...func(a *end)
 	for _, f := range setup {
 		f(a)
 	}
-	server := NewServer(a, items, ServerOptions{ChunkSize: chunk, Hash: hashFile})
+	server := NewServer(a, items, ServerOptions{ChunkSize: chunk, Hashes: &hashes{}})
 	a.onMsg = server.HandleMessage
 	a.onLow = server.Poke
 	a.onClose = server.Close
@@ -282,6 +294,40 @@ func TestResumesAfterChannelDies(t *testing.T) {
 	if !bytes.Equal(sink.bytes(), data) {
 		t.Error("content mismatch after resume")
 	}
+}
+
+func TestHashIsSharedBetweenReceivers(t *testing.T) {
+	dir := t.TempDir()
+	p, _ := randomFile(t, dir, 3*MiB, "shared.bin")
+	cache := &hashes{}
+	connectWith := func(client *Client) {
+		a, b := newPair()
+		server := NewServer(a, share(p), ServerOptions{ChunkSize: 64 * 1024, Hashes: cache})
+		a.onMsg, a.onLow, a.onClose = server.HandleMessage, server.Poke, server.Close
+		b.onMsg = client.HandleMessage
+		client.Attach(b)
+		go a.run()
+		go b.run()
+		server.Start()
+	}
+
+	first := NewClient(ClientCallbacks{})
+	connectWith(first)
+	waitFor(t, "hello", time.Second, func() bool { return len(first.Items()) == 1 })
+	first.Download(0, sinkOf(&memSink{}))
+	waitFor(t, "done", 5*time.Second, func() bool { return first.State(0).Status == StatusDone })
+	sum, ok := cache.Get(0)
+	if !ok || len(sum) != 64 {
+		t.Fatalf("hash not cached after the first transfer: %q", sum)
+	}
+
+	// The second receiver gets the cached sum: poison it to prove it's used.
+	cache.Put(0, strings.Repeat("0", 64))
+	second := NewClient(ClientCallbacks{})
+	connectWith(second)
+	waitFor(t, "hello", time.Second, func() bool { return len(second.Items()) == 1 })
+	second.Download(0, sinkOf(&memSink{}))
+	waitFor(t, "error", 5*time.Second, func() bool { return second.State(0).Status == StatusError })
 }
 
 func TestEndArrivingTwiceFinishesOnce(t *testing.T) {

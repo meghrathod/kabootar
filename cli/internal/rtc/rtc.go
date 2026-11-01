@@ -4,6 +4,7 @@ package rtc
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -136,17 +137,48 @@ func Route(pc *webrtc.PeerConnection) string {
 		return "relay"
 	case l == webrtc.ICECandidateTypeHost && r == webrtc.ICECandidateTypeHost,
 		// The remote is often peer-reflexive (its checks arrived before its
-		// candidates); two local addresses still mean the same network.
-		localAddr(pair.Local.Address) && localAddr(pair.Remote.Address):
+		// candidates); local addresses still mean the same network.
+		sameNetwork(pair.Local.Address, pair.Remote.Address):
 		return "lan"
 	default:
 		return "direct"
 	}
 }
 
-func localAddr(addr string) bool {
-	ip := net.ParseIP(addr)
-	return ip != nil && (ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLoopback())
+// Addrs describes the selected candidate pair, e.g.
+// "192.168.1.5 ↔ 192.168.1.9, host/host udp", to diagnose slow routes.
+func Addrs(pc *webrtc.PeerConnection) string {
+	sctp := pc.SCTP()
+	if sctp == nil || sctp.Transport() == nil || sctp.Transport().ICETransport() == nil {
+		return ""
+	}
+	pair, err := sctp.Transport().ICETransport().GetSelectedCandidatePair()
+	if err != nil || pair == nil || pair.Local == nil || pair.Remote == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s ↔ %s, %s/%s %s", pair.Local.Address, pair.Remote.Address,
+		pair.Local.Typ, pair.Remote.Typ, pair.Local.Protocol)
+}
+
+// sameNetwork reports whether two addresses are on one local network:
+// both private, either link-local (only reachable on the same link), or
+// two IPv6 addresses in the same /64.
+func sameNetwork(a, b string) bool {
+	ipA, ipB := net.ParseIP(a), net.ParseIP(b)
+	if ipA == nil || ipB == nil {
+		return false
+	}
+	local := func(ip net.IP) bool { return ip.IsPrivate() || ip.IsLoopback() }
+	switch {
+	case ipA.IsLinkLocalUnicast() || ipB.IsLinkLocalUnicast():
+		return true
+	case local(ipA) && local(ipB):
+		return true
+	case ipA.To4() == nil && ipB.To4() == nil:
+		mask := net.CIDRMask(64, 128)
+		return ipA.Mask(mask).Equal(ipB.Mask(mask))
+	}
+	return false
 }
 
 var RouteLabel = map[string]string{

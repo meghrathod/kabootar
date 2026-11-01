@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/meghrathod/kabootar/cli/internal/ui"
@@ -23,7 +24,13 @@ func cmdDemo(ctx context.Context, stderr io.Writer) int {
 	start := time.Now()
 	tick := time.NewTicker(50 * time.Millisecond)
 	defer tick.Stop()
-	t.Printf("Demo: a pretend 3 GB transfer (Ctrl-C to stop)")
+	var mu sync.Mutex
+	line := "  ↓ demo.bin  0% of 3.0 GB"
+	t.SetView(func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return []string{"🕊  Demo · a pretend 3 GB transfer (Ctrl-C to stop)", line}
+	})
 	for {
 		select {
 		case <-ctx.Done():
@@ -34,10 +41,15 @@ func cmdDemo(ctx context.Context, stderr io.Writer) int {
 		// Speed ramps up and down so the wingbeat changes.
 		speed := float64(total) / duration.Seconds() * (0.3 + 1.4*frac*(1-frac)*2)
 		t.Progress(frac, speed)
-		t.Status(fmt.Sprintf("↓ demo.bin  %s %3.0f%%  %s", ui.Bar(int64(frac*total), total, 20), frac*100, ui.Speed(speed)))
+		t.Status(fmt.Sprintf("↓ %s %3.0f%%  %s", ui.Bar(int64(frac*total), total, 24), frac*100, ui.Speed(speed)))
+		mu.Lock()
+		line = fmt.Sprintf("  ↓ demo.bin  %.0f%% of 3.0 GB", frac*100)
+		if frac >= 1 {
+			line = "  ✓ demo.bin  3.0 GB · verified"
+		}
+		mu.Unlock()
 		if frac >= 1 {
 			t.Status("")
-			t.Printf("✓ demo.bin  3.0 GB  verified")
 			return 0
 		}
 	}

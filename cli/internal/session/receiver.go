@@ -30,6 +30,7 @@ type ReceiverEvent struct {
 	Message string
 	Room    api.RoomInfo
 	Route   string
+	Addrs   string
 	Items   []protocol.Item
 	ID      int
 	State   transfer.ItemState
@@ -127,6 +128,10 @@ func (r *Receiver) emit(e ReceiverEvent) {
 func (r *Receiver) Done() <-chan struct{} { return r.done }
 
 func (r *Receiver) setStatus(status, route string) {
+	r.setStatusAddrs(status, route, "")
+}
+
+func (r *Receiver) setStatusAddrs(status, route, addrs string) {
 	r.mu.Lock()
 	if r.ended || (r.status == status && route == "") {
 		r.mu.Unlock()
@@ -135,7 +140,7 @@ func (r *Receiver) setStatus(status, route string) {
 	r.status = status
 	room := r.room
 	r.mu.Unlock()
-	r.emit(ReceiverEvent{Type: "status", Status: status, Room: room, Route: route})
+	r.emit(ReceiverEvent{Type: "status", Status: status, Room: room, Route: route, Addrs: addrs})
 }
 
 func (r *Receiver) healthy() bool {
@@ -288,7 +293,7 @@ func (r *Receiver) newConnectionLocked(link string) error {
 				r.watchdog.Stop()
 			}
 			r.mu.Unlock()
-			r.setStatus(RecvConnected, rtc.Route(pc))
+			r.setStatusAddrs(RecvConnected, rtc.Route(pc), rtc.Addrs(pc))
 		})
 		dc.OnClose(func() {
 			r.Client.Detach(ch)

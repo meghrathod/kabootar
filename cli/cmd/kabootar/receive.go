@@ -11,7 +11,6 @@ import (
 
 	"github.com/meghrathod/kabootar/cli/internal/api"
 	"github.com/meghrathod/kabootar/cli/internal/protocol"
-	"github.com/meghrathod/kabootar/cli/internal/rtc"
 	"github.com/meghrathod/kabootar/cli/internal/session"
 	"github.com/meghrathod/kabootar/cli/internal/transfer"
 	"github.com/meghrathod/kabootar/cli/internal/ui"
@@ -70,8 +69,7 @@ func cmdReceive(ctx context.Context, args []string, stdout, stderr io.Writer) in
 
 	t := newTerm(stderr, !*noArt)
 	defer t.Close()
-	rs := &recvState{t: t, stdout: stdout, dir: *out, force: *force, meter: &ui.Meter{}, finished: make(chan struct{})}
-	t.Printf("Connecting…")
+	rs := newRecvState(t, stdout, isTerminal(stdout), *out, *force)
 	r := session.StartReceiver(session.ReceiverOptions{
 		API:       client,
 		UserAgent: userAgent(),
@@ -83,8 +81,7 @@ func cmdReceive(ctx context.Context, args []string, stdout, stderr io.Writer) in
 
 	select {
 	case <-ctx.Done():
-		t.Status("")
-		t.Printf("Cancelled.")
+		rs.setNote("Cancelled.")
 		r.Leave()
 		return 130
 	case <-rs.finished:
@@ -98,20 +95,54 @@ func cmdReceive(ctx context.Context, args []string, stdout, stderr io.Writer) in
 type recvState struct {
 	t      *ui.Term
 	stdout io.Writer
-	dir    string
-	force  bool
-	r      *session.Receiver
-	meter  *ui.Meter
+	// sameScreen: stdout is the terminal the live view is drawn on, so
+	// text goes above the view instead of straight to stdout.
+	sameScreen bool
+	dir        string
+	force      bool
+	r          *session.Receiver
+	meter      ui.Meter
 
 	mu        sync.Mutex
+	conn      string
+	note      string
 	items     []protocol.Item
-	ended     string
-	endMsg    string
+	states    map[int]transfer.ItemState
+	speed     float64
 	started   time.Time
 	total     int64
+	summary   string
 	finished  chan struct{}
 	finishedO sync.Once
-	reported  map[int]bool
+}
+
+func newRecvState(t *ui.Term, stdout io.Writer, sameScreen bool, dir string, force bool) *recvState {
+	rs := &recvState{t: t, stdout: stdout, sameScreen: sameScreen, dir: dir, force: force,
+		conn: "Connecting…", states: map[int]transfer.ItemState{}, finished: make(chan struct{})}
+	t.SetView(rs.view)
+	rs.log("Connecting…")
+	return rs
+}
+
+// log prints an event line when output isn't redrawn in place.
+func (rs *recvState) log(format string, a ...any) {
+	if !rs.t.Live() {
+		rs.t.Printf(format, a...)
+	}
+}
+
+func (rs *recvState) setConn(format string, a ...any) {
+	rs.mu.Lock()
+	rs.conn = fmt.Sprintf(format, a...)
+	rs.mu.Unlock()
+	rs.log(format, a...)
+}
+
+func (rs *recvState) setNote(format string, a ...any) {
+	rs.mu.Lock()
+	rs.note = fmt.Sprintf(format, a...)
+	rs.mu.Unlock()
+	rs.log(format, a...)
 }
 
 func (rs *recvState) files() []protocol.Item {
@@ -136,39 +167,41 @@ func (rs *recvState) onEvent(e session.ReceiverEvent) {
 	case "status":
 		switch e.Status {
 		case session.RecvWaiting:
-			rs.t.Printf("Joined %s %s · waiting for the sender…", e.Room.Emoji, e.Room.Name)
+			rs.setConn("%s %s · waiting for the sender…", e.Room.Emoji, e.Room.Name)
 		case session.RecvConnected:
-			route := rtc.RouteLabel[e.Route]
-			if route == "" {
-				route = "peer-to-peer"
-			}
-			rs.t.Printf("Connected · %s", route)
+			rs.setConn("%s %s · connected · %s", e.Room.Emoji, e.Room.Name, routeText(e.Route, e.Addrs))
 		case session.RecvReconnecting:
-			rs.t.Status("")
-			rs.t.Printf("Connection interrupted, reconnecting… (the download resumes where it stopped)")
+			rs.setConn("%s %s · connection interrupted, reconnecting… (resumes where it stopped)", e.Room.Emoji, e.Room.Name)
 		}
 	case "items":
 		rs.onItems(e.Items)
 	case "item":
 		rs.onItem(e.ID, e.State)
 	case "ended":
-		rs.mu.Lock()
-		rs.ended, rs.endMsg = e.Status, e.Message
-		rs.mu.Unlock()
 		if e.Message != "" && !rs.allDone() {
-			rs.t.Status("")
-			rs.t.Printf("%s", e.Message)
+			rs.setNote("%s", e.Message)
 		}
 	}
+}
+
+// printText shows a shared text snippet: on stdout so it can be piped,
+// above the live view when that's the same screen.
+func (rs *recvState) printText(text string) {
+	if rs.sameScreen && rs.t.Live() {
+		rs.t.Printf("Text:\n%s", text)
+		return
+	}
+	rs.log("Text:")
+	fmt.Fprintln(rs.stdout, text)
 }
 
 func (rs *recvState) onItems(items []protocol.Item) {
 	rs.mu.Lock()
 	rs.items = items
-	rs.reported = map[int]bool{}
 	files := rs.files()
 	for _, f := range files {
 		rs.total += f.Size
+		rs.states[f.ID] = transfer.ItemState{Status: transfer.StatusQueued}
 	}
 	rs.started = time.Now()
 	total := rs.total
@@ -176,15 +209,14 @@ func (rs *recvState) onItems(items []protocol.Item) {
 
 	for _, it := range items {
 		if it.Kind == "text" {
-			rs.t.Printf("Text:")
-			fmt.Fprintln(rs.stdout, it.Text)
+			rs.printText(it.Text)
 		}
 	}
 	if len(files) == 0 {
 		rs.finish()
 		return
 	}
-	rs.t.Printf("Receiving %d file%s (%s) into %s", len(files), plural(len(files)), ui.Bytes(total), rs.dir)
+	rs.log("Receiving %d file%s (%s) into %s", len(files), plural(len(files)), ui.Bytes(total), rs.dir)
 	ids := make([]int, len(files))
 	for i, f := range files {
 		ids[i] = f.ID
@@ -195,64 +227,58 @@ func (rs *recvState) onItems(items []protocol.Item) {
 
 func (rs *recvState) onItem(id int, st transfer.ItemState) {
 	rs.mu.Lock()
+	prev := rs.states[id]
+	rs.states[id] = st
 	var meta protocol.Item
 	for _, it := range rs.items {
 		if it.ID == id {
 			meta = it
 		}
 	}
-	report := st.Finished() && !rs.reported[id]
-	if report {
-		rs.reported[id] = true
-	}
+	received, total := rs.receivedLocked(), rs.total
 	rs.mu.Unlock()
 
-	if report {
-		rs.t.Status("")
+	if st.Finished() && !prev.Finished() {
 		switch st.Status {
 		case transfer.StatusDone:
 			check := "unverified"
 			if st.Verified {
 				check = "verified"
 			}
-			rs.t.Printf("✓ %s  %s  %s → %s", displayName(meta), ui.Bytes(meta.Size), check, st.SavedAs)
+			rs.log("✓ %s  %s  %s → %s", displayName(meta), ui.Bytes(meta.Size), check, st.SavedAs)
 		case transfer.StatusError:
-			rs.t.Printf("✗ %s: %s", displayName(meta), st.Error)
+			rs.log("✗ %s: %s", displayName(meta), st.Error)
 		case transfer.StatusCancelled:
-			rs.t.Printf("✗ %s: cancelled", displayName(meta))
+			rs.log("✗ %s: cancelled", displayName(meta))
 		}
-		if rs.allDone() || rs.allFinished() {
+		if rs.allFinished() {
 			rs.finish()
 		}
 		return
 	}
 	if st.Status == transfer.StatusReceiving {
-		received := rs.receivedTotal()
 		speed := rs.meter.Sample(received)
-		pct := 100.0
-		if meta.Size > 0 {
-			pct = float64(st.Received) * 100 / float64(meta.Size)
-		}
-		eta := ""
 		rs.mu.Lock()
-		left, total := rs.total-received, rs.total
+		rs.speed = speed
 		rs.mu.Unlock()
 		frac := 1.0
 		if total > 0 {
 			frac = float64(received) / float64(total)
 		}
 		rs.t.Progress(frac, speed)
+		left := ""
 		if speed > 0 {
-			eta = " · " + ui.Duration(time.Duration(float64(left)/speed*float64(time.Second))) + " left"
+			left = " · " + ui.Duration(time.Duration(float64(total-received)/speed*float64(time.Second))) + " left"
 		}
-		rs.t.Status(fmt.Sprintf("↓ %s  %s %3.0f%%  %s%s", displayName(meta), ui.Bar(st.Received, meta.Size, 20), pct, ui.Speed(speed), eta))
+		rs.t.Status(fmt.Sprintf("↓ %s %3.0f%%  %s / %s  %s%s", ui.Bar(received, total, 24),
+			pct(received, total), ui.Bytes(received), ui.Bytes(total), ui.Speed(speed), left))
 	}
 }
 
-func (rs *recvState) receivedTotal() int64 {
+func (rs *recvState) receivedLocked() int64 {
 	var n int64
-	for _, f := range rs.filesLocked() {
-		st := rs.r.Client.State(f.ID)
+	for _, f := range rs.files() {
+		st := rs.states[f.ID]
 		if st.Status == transfer.StatusDone {
 			n += f.Size
 		} else {
@@ -262,30 +288,24 @@ func (rs *recvState) receivedTotal() int64 {
 	return n
 }
 
-func (rs *recvState) filesLocked() []protocol.Item {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-	return rs.files()
-}
-
 // allDone reports whether every file arrived.
 func (rs *recvState) allDone() bool {
-	files := rs.filesLocked()
-	if rs.r == nil {
-		return false
-	}
-	for _, f := range files {
-		if rs.r.Client.State(f.ID).Status != transfer.StatusDone {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	for _, f := range rs.files() {
+		if rs.states[f.ID].Status != transfer.StatusDone {
 			return false
 		}
 	}
-	return true
+	return rs.items != nil
 }
 
 // allFinished reports whether every file reached a final state.
 func (rs *recvState) allFinished() bool {
-	for _, f := range rs.filesLocked() {
-		if !rs.r.Client.State(f.ID).Finished() {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	for _, f := range rs.files() {
+		if !rs.states[f.ID].Finished() {
 			return false
 		}
 	}
@@ -294,28 +314,116 @@ func (rs *recvState) allFinished() bool {
 
 func (rs *recvState) finish() {
 	rs.finishedO.Do(func() {
+		done := rs.allDone()
 		rs.mu.Lock()
 		files := rs.files()
 		elapsed := time.Since(rs.started)
 		total := rs.total
-		rs.mu.Unlock()
-		if len(files) > 0 && rs.allDone() {
+		if len(files) > 0 && done {
 			avg := ""
 			if elapsed > 0 {
 				avg = " · " + ui.Speed(float64(total)/elapsed.Seconds())
 			}
-			rs.t.Printf("Done: %d file%s, %s in %s%s", len(files), plural(len(files)), ui.Bytes(total), ui.Duration(elapsed), avg)
+			rs.summary = fmt.Sprintf("Done: %d file%s, %s in %s%s → %s", len(files), plural(len(files)), ui.Bytes(total), ui.Duration(elapsed), avg, rs.dir)
+		}
+		summary := rs.summary
+		rs.mu.Unlock()
+		rs.t.Status("")
+		if summary != "" {
+			rs.log("%s", summary)
 		}
 		close(rs.finished)
 	})
 }
 
 func (rs *recvState) exitCode() int {
-	rs.mu.Lock()
-	gotItems := rs.items != nil
-	rs.mu.Unlock()
-	if gotItems && rs.allDone() {
+	if rs.allDone() {
 		return 0
 	}
 	return 1
+}
+
+// maxListed bounds the file list in the live view.
+const maxListed = 8
+
+// view is the live block, redrawn in place: the connection, the files
+// (active and recent first, the rest summarised) and any note.
+func (rs *recvState) view() []string {
+	rs.mu.Lock()
+	defer rs.mu.Unlock()
+	lines := []string{rs.conn}
+	files := rs.files()
+	var active, queued, done, failed []protocol.Item
+	for _, f := range files {
+		switch st := rs.states[f.ID]; st.Status {
+		case transfer.StatusReceiving, transfer.StatusVerifying:
+			active = append(active, f)
+		case transfer.StatusDone:
+			done = append(done, f)
+		case transfer.StatusError, transfer.StatusCancelled:
+			failed = append(failed, f)
+		default:
+			queued = append(queued, f)
+		}
+	}
+	row := func(f protocol.Item) string {
+		st := rs.states[f.ID]
+		switch st.Status {
+		case transfer.StatusDone:
+			check := ""
+			if st.Verified {
+				check = " · verified"
+			}
+			return fmt.Sprintf("  ✓ %s  %s%s", displayName(f), ui.Bytes(f.Size), check)
+		case transfer.StatusError:
+			return fmt.Sprintf("  ✗ %s  %s", displayName(f), st.Error)
+		case transfer.StatusCancelled:
+			return fmt.Sprintf("  ✗ %s  cancelled", displayName(f))
+		case transfer.StatusReceiving:
+			return fmt.Sprintf("  ↓ %s  %.0f%% of %s", displayName(f), pct(st.Received, f.Size), ui.Bytes(f.Size))
+		case transfer.StatusVerifying:
+			return fmt.Sprintf("  ↓ %s  verifying…", displayName(f))
+		}
+		return fmt.Sprintf("  · %s  %s", displayName(f), ui.Bytes(f.Size))
+	}
+	// Failures and the active file always show; then the latest finished
+	// files, then what's next; anything else becomes a count.
+	var shown []protocol.Item
+	shown = append(shown, failed...)
+	room := max(0, maxListed-len(shown)-len(active))
+	if len(done) > room {
+		done = done[len(done)-room:]
+	}
+	shown = append(shown, done...)
+	shown = append(shown, active...)
+	room = max(0, maxListed-len(shown))
+	moreQueued := 0
+	if len(queued) > room {
+		moreQueued = len(queued) - room
+		queued = queued[:room]
+	}
+	shown = append(shown, queued...)
+	hiddenDone := 0
+	for _, f := range files {
+		if rs.states[f.ID].Status == transfer.StatusDone {
+			hiddenDone++
+		}
+	}
+	hiddenDone -= len(done)
+	if hiddenDone > 0 {
+		lines = append(lines, fmt.Sprintf("  ✓ %d more received", hiddenDone))
+	}
+	for _, f := range shown {
+		lines = append(lines, row(f))
+	}
+	if moreQueued > 0 {
+		lines = append(lines, fmt.Sprintf("  · %d more to come", moreQueued))
+	}
+	if rs.note != "" {
+		lines = append(lines, rs.note)
+	}
+	if rs.summary != "" {
+		lines = append(lines, rs.summary)
+	}
+	return lines
 }
