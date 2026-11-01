@@ -7,12 +7,13 @@
 | Path | Port of | What |
 | --- | --- | --- |
 | `internal/protocol` | `src/lib/transfer/protocol.ts` | Data-channel messages, constants, sanitizing |
-| `internal/transfer` | `src/lib/transfer/{server,client}.ts` | `Server` sends items, `Client` receives into `FileSink` (`.part`, then rename) |
+| `internal/transfer` | `src/lib/transfer/{server,client}.ts` | `Server` sends items, hashing as it reads (one pass over the file, with read-ahead) and sharing the result between receivers. `Client` receives into `FileSink` (`.part`, then rename) |
 | `internal/signal` | `src/lib/signal.ts` | Room websocket: auth, heartbeat, reconnect with backoff |
 | `internal/session` | `src/lib/{sender,receiver}.ts` | One Pion peer connection per receiver; ICE restart, fresh links on `restart`, stall detection |
 | `internal/rtc` | `src/lib/rtc.ts`, `publicIp.ts` | Signal payloads, ICE server parsing, route detection, STUN lookup for Nearby |
 | `internal/api` | `src/lib/api.ts` | `POST /api/rooms`, `POST /api/join`, share links |
-| `internal/ui` | | Terminal output: event lines plus a live block (pigeon and status line) |
+| `internal/ui` | | Terminal output: a live block redrawn in place (the command's view, the pigeon, a status line); plain event lines when not a terminal |
+| `internal/update` | | `kabootar update` (download, verify the checksum, check that it runs, swap in) and the once-a-day new-version notice |
 | `internal/ui/pigeon` | | Renders `public/assets/logo-mark.png` as coloured ASCII and animates the wingbeat |
 
 The worker needs no changes: it already accepts websockets without an `Origin` header (non-browser clients).

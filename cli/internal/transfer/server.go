@@ -1,7 +1,10 @@
 package transfer
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"hash"
 	"io"
 	"os"
 	"slices"
@@ -30,10 +33,17 @@ type ServerEvent struct {
 
 type ServerOptions struct {
 	ChunkSize int
-	// Hash returns the SHA-256 (hex) of a file; it may be shared between
-	// receivers and is awaited only after the last byte is sent.
-	Hash    func(item ShareItem) (string, error)
+	// Hashes shares finished SHA-256 sums (hex) between receivers; nil
+	// means every transfer hashes as it goes.
+	Hashes  HashCache
 	OnEvent func(ServerEvent)
+}
+
+// HashCache remembers file hashes by item id. It must be safe for
+// concurrent use.
+type HashCache interface {
+	Get(id int) (string, bool)
+	Put(id int, sum string)
 }
 
 type request struct {
@@ -213,23 +223,28 @@ func (s *Server) sendFile(active *activeSend, offset int64) {
 		_ = s.ch.SendText(string(protocol.Error(id, "Sender could not read the file")))
 	}
 
-	// Start hashing in parallel; it's awaited only at the end.
-	type hashResult struct {
-		sum string
-		err error
-	}
-	hashed := make(chan hashResult, 1)
-	go func() {
-		sum, err := s.hash(*item)
-		hashed <- hashResult{sum, err}
-	}()
-
 	f, err := os.Open(item.Path)
 	if err != nil {
 		fail(err)
 		return
 	}
 	defer f.Close()
+
+	// Hash while reading for sending, so the file is read once: a second
+	// reader at another offset makes a hard disk seek back and forth. A
+	// finished hash is shared with later receivers through the cache.
+	sum, known := s.cached(id)
+	var h hash.Hash
+	if !known {
+		h = sha256.New()
+		// Resuming: hash the part already sent first (one sequential pass).
+		if pos > 0 {
+			if _, err := io.CopyN(h, f, pos); err != nil {
+				fail(err)
+				return
+			}
+		}
+	}
 	if _, err := f.Seek(pos, io.SeekStart); err != nil {
 		fail(err)
 		return
@@ -238,49 +253,77 @@ func (s *Server) sendFile(active *activeSend, offset int64) {
 	if err := s.ch.SendText(string(protocol.Start(id, pos))); err != nil {
 		return
 	}
-	chunk := s.opts.ChunkSize
-	for pos < size {
-		// A fresh buffer per block: the channel may still hold the last one.
-		block := make([]byte, min(int64(protocol.ReadBlock), size-pos))
-		n, err := io.ReadFull(f, block)
-		if err != nil {
-			if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF) {
+
+	// Read ahead on another goroutine so the disk works while the
+	// previous block goes out.
+	type block struct {
+		data []byte
+		err  error
+	}
+	blocks := make(chan block, 2)
+	stop := make(chan struct{})
+	defer close(stop)
+	go func(from int64) {
+		defer close(blocks)
+		for p := from; p < size; {
+			// A fresh buffer per block: the channel may still hold the last one.
+			b := make([]byte, min(int64(protocol.ReadBlock), size-p))
+			n, err := io.ReadFull(f, b)
+			if err != nil && (errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF)) {
 				err = errors.New("file changed size while sharing")
 			}
-			fail(err)
+			select {
+			case blocks <- block{b[:n], err}:
+			case <-stop:
+				return
+			}
+			if err != nil {
+				return
+			}
+			p += int64(n)
+		}
+	}(pos)
+
+	chunk := s.opts.ChunkSize
+	for b := range blocks {
+		if b.err != nil {
+			fail(b.err)
 			return
 		}
-		for i := 0; i < n; i += chunk {
+		if h != nil {
+			h.Write(b.data)
+		}
+		for i := 0; i < len(b.data); i += chunk {
 			if !s.capacity(active) {
 				return
 			}
-			end := min(i+chunk, n)
-			if err := s.ch.Send(block[i:end]); err != nil {
+			end := min(i+chunk, len(b.data))
+			if err := s.ch.Send(b.data[i:end]); err != nil {
 				return
 			}
 			s.mu.Lock()
 			s.sent += int64(end - i)
 			s.mu.Unlock()
 		}
-		pos += int64(n)
 	}
 
-	res := <-hashed
 	if s.stopped(active) {
 		return
 	}
-	sum := ""
-	if res.err == nil {
-		sum = res.sum
+	if h != nil {
+		sum = hex.EncodeToString(h.Sum(nil))
+		if s.opts.Hashes != nil {
+			s.opts.Hashes.Put(id, sum)
+		}
 	}
 	_ = s.ch.SendText(string(protocol.End(id, sum)))
 }
 
-func (s *Server) hash(item ShareItem) (string, error) {
-	if s.opts.Hash == nil {
-		return "", errors.New("no hasher")
+func (s *Server) cached(id int) (string, bool) {
+	if s.opts.Hashes == nil {
+		return "", false
 	}
-	return s.opts.Hash(item)
+	return s.opts.Hashes.Get(id)
 }
 
 func (s *Server) stopped(a *activeSend) bool {
