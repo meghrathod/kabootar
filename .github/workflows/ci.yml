@@ -36,6 +36,29 @@ jobs:
       # Runs inside workerd with real Durable Objects.
       - run: yarn test:worker
 
+  cli:
+    name: CLI (vet, race tests, cross-build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - run: GOOS=windows go vet ./...
+      - run: go test -race ./...
+      - name: Cross-build every release target
+        run: |
+          for t in linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            CGO_ENABLED=0 GOOS=${t%/*} GOARCH=${t#*/} GOARM=7 go build -o /dev/null ./cmd/kabootar
+          done
+
   e2e:
     name: End-to-end (two browsers, real WebRTC)
     needs: check
@@ -49,6 +72,11 @@ jobs:
         with:
           node-version: 24
           cache: yarn
+      # The CLI specs build and run the Go client against the same worker.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
       - run: yarn install --immutable
       - run: yarn build
       - run: npx playwright install --with-deps chromium

@@ -22,6 +22,7 @@
 | `src/lib/sinks/`                   | Where received bytes go: save picker, service-worker stream, OPFS, memory        |
 | `src/sw.ts`                        | Service worker: cached app shell, share target, streamed downloads                  |
 | `worker/src/`                      | Cloudflare Worker and durable objects                                            |
+| `cli/`                             | Go command-line client speaking the same protocol (see [CLI.md](CLI.md))         |
 | `e2e/`                             | Playwright tests                                                                 |
 
 ## Signalling

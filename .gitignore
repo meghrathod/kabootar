@@ -1,5 +1,6 @@
 node_modules
 dist
+cli/dist/
 .DS_Store
 # Cloudflare
 .wrangler/
