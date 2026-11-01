@@ -22,7 +22,7 @@ $archive = "kabootar_windows_$arch.zip"
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
-  Write-Host "Downloading $archive…"
+  Write-Host "Downloading $archive..."
   Invoke-WebRequest "$base/$archive" -OutFile "$tmp\$archive" -UseBasicParsing
   Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt" -UseBasicParsing
 
