@@ -76,6 +76,13 @@ func (m *Meter) Sample(bytes int64) float64 {
 	if dt < 0.25 {
 		return m.speed
 	}
+	if bytes < m.lastBytes {
+		// The total went back (a transfer restarted or resumed from an
+		// earlier byte): start measuring again rather than report a
+		// negative speed.
+		m.lastBytes, m.lastTime, m.speed = bytes, now, 0
+		return 0
+	}
 	inst := float64(bytes-m.lastBytes) / dt
 	if m.speed == 0 {
 		m.speed = inst
@@ -273,6 +280,17 @@ func (t *Term) redraw() {
 
 const pigeonFrames = 12
 
+// flapPeriod is the seconds per wingbeat at a speed (bytes/s): 0.75 s at a
+// crawl down to 0.35 s at ~100 MB/s. Any speed, even a bogus negative or
+// NaN one, gives a sane period.
+func flapPeriod(speed float64) float64 {
+	effort := 0.0
+	if speed > 0 && !math.IsInf(speed, 0) {
+		effort = math.Min(1, math.Log10(speed/(1<<20)+1)/2)
+	}
+	return 0.75 - 0.4*effort
+}
+
 func (t *Term) pigeonLines(cols, rows int) []string {
 	size := 0
 	// rows is the room left in the live block once the view and status
@@ -297,12 +315,14 @@ func (t *Term) pigeonLines(cols, rows int) []string {
 	// Wingbeats speed up with the transfer, like the web app's logo.
 	now := time.Now()
 	if !t.last.IsZero() {
-		effort := math.Min(1, math.Log10(t.speed/(1<<20)+1)/2)
-		period := 0.75 - 0.4*effort
-		t.phase += now.Sub(t.last).Seconds() / period
+		t.phase += now.Sub(t.last).Seconds() / flapPeriod(t.speed)
+		if math.IsNaN(t.phase) || math.IsInf(t.phase, 0) {
+			t.phase = 0
+		}
 	}
 	t.last = now
-	frameIdx := int(t.phase*pigeonFrames) % pigeonFrames
+	frameIdx := int(math.Mod(t.phase, 1) * pigeonFrames)
+	frameIdx = min(max(frameIdx, 0), pigeonFrames-1)
 	frame := anim.Frames[frameIdx]
 
 	track := min(cols-1, 100)
