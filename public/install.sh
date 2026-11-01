@@ -45,7 +45,7 @@ archive="kabootar_${os}_${arch}.tar.gz"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-say "Downloading $archive…"
+say "Downloading ${archive}..."
 fetch "$base/$archive" "$tmp/$archive" || fail "download failed: $base/$archive"
 fetch "$base/checksums.txt" "$tmp/checksums.txt" || fail "couldn't download checksums"
 
