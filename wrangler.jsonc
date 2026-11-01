@@ -39,6 +39,24 @@
     "ROOM_TTL_HOURS": "24",
     "MASTER_GRACE_SECONDS": "300",
     "STUN_URLS": "stun:stun.cloudflare.com:3478,stun:stun.l.google.com:19302"
+  },
+
+  // Branch previews (Cloudflare runs `wrangler preview` for non-production
+  // branches). Bindings aren't inherited, so they're repeated here; each
+  // preview gets its own Durable Object namespace and storage.
+  "previews": {
+    "durable_objects": {
+      "bindings": [
+        { "name": "ROOMS", "class_name": "Room" },
+        { "name": "DIRECTORY", "class_name": "Directory" }
+      ]
+    },
+    "vars": {
+      "MAX_PEERS": "8",
+      "ROOM_TTL_HOURS": "24",
+      "MASTER_GRACE_SECONDS": "300",
+      "STUN_URLS": "stun:stun.cloudflare.com:3478,stun:stun.l.google.com:19302"
+    }
   }
 
   // Secrets (wrangler secret put …):
