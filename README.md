@@ -11,6 +11,21 @@ Peer-to-peer file sharing in the browser. Files go straight from one device to a
 - **Verified**: every file is checked with SHA-256 after transfer.
 - **Installable PWA**: opens instantly from the home screen, and on Android it appears in the system share sheet. Sharing needs an internet connection: the server introduces the two devices, then the file goes directly between them.
 
+## Command line
+
+A terminal client for servers and headless machines (for example over SSH). It interoperates with the web app: send from a terminal to a phone, or from a browser to a server.
+
+```sh
+curl -fsSL https://kabootar.meghrathod.dev/install.sh | sh     # Linux, macOS
+irm https://kabootar.meghrathod.dev/install.ps1 | iex          # Windows
+brew tap meghrathod/kabootar https://github.com/meghrathod/kabootar && brew install --cask kabootar
+
+kabootar send ./backup.tar.gz     # prints a code, a link and a QR code
+kabootar receive 123456           # on the other machine (or open the link in a browser)
+```
+
+`.deb` and `.rpm` packages are on GitHub Releases. See [cli/README.md](cli/README.md), and [docs/CLI.md](docs/CLI.md) for development and releases.
+
 ## How it works
 
 The app and its signalling run on Cloudflare: a Worker serves the PWA and API, one Durable Object per share relays WebRTC offers and answers, and Cloudflare Realtime TURN relays traffic when a direct connection isn't possible. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

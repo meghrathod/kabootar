@@ -1,0 +1,117 @@
+# Releases the command-line client (cli/) for Linux, macOS and Windows.
+# Push a tag like v0.1.0 and .github/workflows/release-cli.yml runs this.
+version: 2
+
+project_name: kabootar
+
+# Not dist/: that's the PWA build.
+dist: cli/dist
+
+before:
+  hooks:
+    - sh -c "cd cli && go test ./..."
+
+builds:
+  - id: kabootar
+    dir: cli
+    main: ./cmd/kabootar
+    binary: kabootar
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64, arm]
+    goarm: ["7"]
+    ignore:
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+
+archives:
+  - id: kabootar
+    # Stable names, so install.sh can use releases/latest/download/….
+    name_template: >-
+      kabootar_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - src: cli/README.md
+        dst: README.md
+
+checksum:
+  name_template: checksums.txt
+
+nfpms:
+  - id: packages
+    package_name: kabootar
+    file_name_template: >-
+      kabootar_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
+    vendor: Kabootar
+    homepage: https://kabootar.meghrathod.dev
+    maintainer: Megh Rathod <msr.megh@gmail.com>
+    description: Send files peer-to-peer from the terminal, to other terminals or any browser.
+    license: MIT
+    formats: [deb, rpm]
+    bindir: /usr/bin
+
+# Homebrew cask, kept in this repo's Casks/ folder (no separate tap repo).
+# develop is protected, so each release opens a PR that updates the cask.
+# Users install with:
+#   brew tap meghrathod/kabootar https://github.com/meghrathod/kabootar
+#   brew install --cask kabootar
+homebrew_casks:
+  - name: kabootar
+    binaries: [kabootar]
+    directory: Casks
+    homepage: https://kabootar.meghrathod.dev
+    description: Send files peer-to-peer from the terminal
+    license: MIT
+    # Prereleases (v1.0.0-rc1) don't touch the cask.
+    skip_upload: auto
+    commit_msg_template: "chore(cli): brew cask for kabootar {{ .Tag }}"
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+    # The binaries aren't notarized; files fetched by brew get the
+    # quarantine flag, which would make macOS refuse to run them.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/kabootar"]
+          end
+    repository:
+      owner: meghrathod
+      name: kabootar
+      pull_request:
+        enabled: true
+        base:
+          owner: meghrathod
+          name: kabootar
+          branch: develop
+
+release:
+  github:
+    owner: meghrathod
+    name: kabootar
+  name_template: "kabootar CLI {{ .Tag }}"
+  footer: |
+    **Install**
+
+    - Linux, macOS: `curl -fsSL https://kabootar.meghrathod.dev/install.sh | sh`
+    - Homebrew: `brew tap meghrathod/kabootar https://github.com/meghrathod/kabootar && brew install --cask kabootar`
+    - Windows: `irm https://kabootar.meghrathod.dev/install.ps1 | iex`
+    - Ubuntu/Debian/Fedora: the `.deb` / `.rpm` below
+
+changelog:
+  filters:
+    include:
+      - "^feat\\(cli\\)"
+      - "^fix\\(cli\\)"
