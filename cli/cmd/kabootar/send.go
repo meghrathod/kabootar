@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -228,17 +230,9 @@ func (st *sendState) printHeader(s *session.Sender, qr bool) {
 	st.t.Printf("  Code  %s", pin)
 	st.t.Printf("  Link  %s\n", s.Link)
 	if qr {
-		cfg := qrterminal.Config{
-			Level:          qrterminal.L,
-			Writer:         &qrWriter{st.t},
-			HalfBlocks:     true,
-			BlackChar:      qrterminal.BLACK_BLACK,
-			WhiteBlackChar: qrterminal.WHITE_BLACK,
-			WhiteChar:      qrterminal.WHITE_WHITE,
-			BlackWhiteChar: qrterminal.BLACK_WHITE,
-			QuietZone:      1,
+		for _, line := range qrLines(s.Link) {
+			st.t.Printf("  %s", line)
 		}
-		qrterminal.GenerateWithConfig(s.Link, cfg)
 	}
 	st.t.Printf("On the other device: kabootar receive %s   (or open the link in a browser)", s.Created.PIN)
 	if s.Created.Hidden {
@@ -247,11 +241,22 @@ func (st *sendState) printHeader(s *session.Sender, qr bool) {
 	st.t.Printf("Waiting for receivers… (Ctrl-C to stop sharing)\n")
 }
 
-type qrWriter struct{ t *ui.Term }
-
-func (w *qrWriter) Write(p []byte) (int, error) {
-	w.t.Printf("%s", string(p))
-	return len(p), nil
+// qrLines renders a QR code with half blocks, two modules per character
+// row. The library writes in small pieces, so collect it and split it into
+// whole lines before printing.
+func qrLines(text string) []string {
+	var buf bytes.Buffer
+	qrterminal.GenerateWithConfig(text, qrterminal.Config{
+		Level:          qrterminal.L,
+		Writer:         &buf,
+		HalfBlocks:     true,
+		BlackChar:      qrterminal.BLACK_BLACK,
+		WhiteBlackChar: qrterminal.WHITE_BLACK,
+		WhiteChar:      qrterminal.WHITE_WHITE,
+		BlackWhiteChar: qrterminal.BLACK_WHITE,
+		QuietZone:      1,
+	})
+	return strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
 }
 
 func plural(n int) string {
