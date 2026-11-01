@@ -14,11 +14,13 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/term"
 
 	"github.com/meghrathod/kabootar/cli/internal/api"
 	"github.com/meghrathod/kabootar/cli/internal/ui"
+	"github.com/meghrathod/kabootar/cli/internal/update"
 )
 
 // Set at build time with -ldflags "-X main.version=…".
@@ -29,6 +31,7 @@ const usage = `Kabootar: send files peer-to-peer, straight from one device to an
 Usage:
   kabootar send [flags] <file or folder>...   share files and print a code
   kabootar receive [flags] <code or link>     download a share
+  kabootar update                             update to the latest release
   kabootar version
 
 Send flags:
@@ -46,7 +49,8 @@ Receive flags:
 Common flags:
       --server URL    Kabootar server (default $KABOOTAR_SERVER or ` + api.DefaultServer + `)
 
-Receivers can also open the printed link in any browser.
+Receivers can also open the printed link in any browser. Kabootar mentions
+new releases at most once a day (KABOOTAR_NO_UPDATE_CHECK=1 turns that off).
 `
 
 func main() {
@@ -60,11 +64,20 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprint(stderr, usage)
 		return 2
 	}
+	update.Cleanup()
+	if args[0] != "update" && args[0] != "demo" {
+		if n := notifier(stderr); n != nil {
+			n.Start()
+			defer n.Finish(1500 * time.Millisecond)
+		}
+	}
 	switch args[0] {
 	case "send", "s":
 		return cmdSend(ctx, args[1:], stderr)
 	case "receive", "recv", "r", "get":
 		return cmdReceive(ctx, args[1:], stdout, stderr)
+	case "update", "upgrade":
+		return cmdUpdate(ctx, args[1:], stderr)
 	case "demo":
 		return cmdDemo(ctx, stderr)
 	case "version", "--version", "-v":
