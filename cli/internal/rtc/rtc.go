@@ -106,6 +106,11 @@ func API() *webrtc.API {
 		se.SetSCTPMaxReceiveBufferSize(8 * 1024 * 1024)
 		// Resolve the browser's obfuscated ".local" candidates on a LAN.
 		se.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryOnly)
+		// Keep transfers off VPN and container interfaces (interfaces.go).
+		if !allInterfaces() {
+			se.SetInterfaceFilter(keepInterface)
+			se.SetIPFilter(keepIP)
+		}
 		if os.Getenv("KABOOTAR_DEBUG") == "" {
 			se.LoggerFactory = quietLogger{}
 		}

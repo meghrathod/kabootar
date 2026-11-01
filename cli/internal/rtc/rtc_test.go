@@ -1,6 +1,9 @@
 package rtc
 
-import "testing"
+import (
+	"net"
+	"testing"
+)
 
 func TestSameNetwork(t *testing.T) {
 	cases := []struct {
@@ -9,9 +12,9 @@ func TestSameNetwork(t *testing.T) {
 	}{
 		{"192.168.1.5", "192.168.1.9", true},
 		{"10.0.0.2", "192.168.1.9", true},
-		{"2600:4041:41d4:f900:48a:d969:74a1:8ef4", "fe80::c1f:5745:1", true},
-		{"2600:4041:41d4:f900::1", "2600:4041:41d4:f900::2", true},
-		{"2600:4041:41d4:f900::1", "2600:4041:41d4:aaaa::2", false},
+		{"2001:db8:1:2::8ef4", "fe80::1", true},
+		{"2001:db8:1:2::1", "2001:db8:1:2::2", true},
+		{"2001:db8:1:2::1", "2001:db8:1:3::2", false},
 		{"203.0.113.5", "192.168.1.9", false},
 		{"203.0.113.5", "198.51.100.7", false},
 		{"abcd.local", "192.168.1.9", false},
@@ -34,5 +37,26 @@ func TestParseICEServers(t *testing.T) {
 	}
 	if !HasTurn(got) {
 		t.Error("TURN not detected")
+	}
+}
+
+func TestSkipsVPNAndVirtualInterfaces(t *testing.T) {
+	for name, want := range map[string]bool{
+		"en0": true, "eth0": true, "enp3s0": true, "wlan0": true, "Wi-Fi": true, "Ethernet": true,
+		"tailscale0": false, "Tailscale": false, "CloudflareWARP": false, "utun4": false,
+		"wg0": false, "docker0": false, "br-1a2b3c": false, "veth9f": false, "zt5u4y": false,
+	} {
+		if got := keepInterface(name); got != want {
+			t.Errorf("keepInterface(%q) = %v, want %v", name, got, want)
+		}
+	}
+	for addr, want := range map[string]bool{
+		// LAN kept; Tailscale and Cloudflare WARP dropped.
+		"192.168.1.20": true, "2001:db8:1:2::20": true, "10.10.1.1": true,
+		"100.101.102.103": false, "fd7a:115c:a1e0::1": false, "2606:4700:110:8000::1": false,
+	} {
+		if got := keepIP(net.ParseIP(addr)); got != want {
+			t.Errorf("keepIP(%s) = %v, want %v", addr, got, want)
+		}
 	}
 }
