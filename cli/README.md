@@ -86,5 +86,6 @@ The server only introduces the two machines. Files then go directly between them
 ## Troubleshooting
 
 - `KABOOTAR_DEBUG=1` prints WebRTC (Pion) logs.
+- VPNs and container networks (Tailscale, Cloudflare WARP, WireGuard, ZeroTier, Docker…) aren't used for transfers. A path through a tunnel can win over the LAN and then crawl. If a VPN is genuinely the only way between two machines, set `KABOOTAR_ALL_INTERFACES=1` on both.
 - Slow on your own network? Check the route on the connected line. `same network` is the LAN. `peer-to-peer` with public addresses, or `relayed`, means the traffic is leaving your network (for example through a VPN or the router's public address).
 - "Couldn't establish a connection": both networks block direct connections and no relay was available. Try another network.
