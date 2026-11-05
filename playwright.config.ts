@@ -5,6 +5,9 @@ const port = 8090;
 export default defineConfig({
   testDir: "e2e",
   timeout: 90_000,
+  // Starting a share first asks public STUN servers for the public IP (up to
+  // 3.5s), which on CI runners plus a cold worker can exceed the 5s default.
+  expect: { timeout: 15_000 },
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
