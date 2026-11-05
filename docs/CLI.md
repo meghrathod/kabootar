@@ -48,7 +48,7 @@ Push a tag like `v0.1.0`. `.github/workflows/release-cli.yml` runs GoReleaser (`
 - `.deb` and `.rpm` packages
 - `checksums.txt`
 
-`public/install.sh` and `public/install.ps1` (served by the worker at `/install.sh` and `/install.ps1`) download from the latest release and verify the checksum. So the install commands only work once the first release exists.
+`public/install.sh` and `public/install.ps1` (served by the worker at `/install.sh` and `/install.ps1`) download from the latest release and verify the checksum. When the install directory isn't on `PATH`, `install.sh` adds it to the startup file of the shell that ran it (`.zshrc`, `.bash_profile` on macOS or `.bashrc`, or a fish `conf.d` file); set `KABOOTAR_NO_MODIFY_PATH=1` to skip that. So the install commands only work once the first release exists.
 
 **Homebrew:** the cask lives in this repo at `Casks/kabootar.rb`, so there's no separate tap repo. `develop` requires a reviewed PR, so on each release GoReleaser opens a PR updating the cask; merge it to publish the new version to brew users (prereleases skip this). Users tap this repo by URL, since it isn't named `homebrew-*`:
 

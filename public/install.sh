@@ -7,6 +7,8 @@
 #   KABOOTAR_VERSION      release to install, e.g. v0.1.0 (default: latest)
 #   KABOOTAR_INSTALL_DIR  where to put the binary (default: /usr/local/bin if
 #                         writable, otherwise ~/.local/bin)
+#   KABOOTAR_NO_MODIFY_PATH=1  don't add the install directory to the shell's
+#                         startup file when it isn't already on PATH
 set -eu
 
 repo="meghrathod/kabootar"
@@ -73,8 +75,53 @@ mv "$tmp/kabootar" "$dir/kabootar"
 chmod +x "$dir/kabootar"
 
 say "Installed $("$dir/kabootar" version) to $dir/kabootar"
+# The shell that ran `curl ... | sh` is our parent; fall back to the login shell.
+shell_name() {
+  name="$(ps -p "$PPID" -o comm= 2>/dev/null || true)"
+  case "${name##*/}" in
+    -*) name="${name#-}" ;;
+  esac
+  case "${name##*/}" in
+    zsh | bash | fish) printf '%s' "${name##*/}" ;;
+    *) printf '%s' "${SHELL##*/}" ;;
+  esac
+}
+
+# Appends a PATH line to the shell's startup file, once.
+add_to_path() {
+  case "$(shell_name)" in
+    zsh)
+      rc="${ZDOTDIR:-$HOME}/.zshrc"
+      line="export PATH=\"$dir:\$PATH\""
+      now="$line"
+      ;;
+    bash)
+      # macOS Terminal opens login shells, which read .bash_profile, not .bashrc.
+      if [ "$os" = darwin ]; then rc="$HOME/.bash_profile"; else rc="$HOME/.bashrc"; fi
+      line="export PATH=\"$dir:\$PATH\""
+      now="$line"
+      ;;
+    fish)
+      rc="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/kabootar.fish"
+      line="fish_add_path \"$dir\""
+      now="$line"
+      ;;
+    *) return 1 ;;
+  esac
+  mkdir -p "$(dirname "$rc")" || return 1
+  if ! grep -qsF "$line" "$rc"; then
+    printf '\n# Added by the kabootar installer\n%s\n' "$line" >>"$rc" || return 1
+  fi
+  say "Added $dir to PATH in $rc. Open a new terminal, or run:"
+  say "  $now"
+}
+
 case ":$PATH:" in
   *":$dir:"*) ;;
-  *) say "Add $dir to your PATH to run it as 'kabootar'." ;;
+  *)
+    if [ "${KABOOTAR_NO_MODIFY_PATH:-}" = 1 ] || ! add_to_path; then
+      say "Add $dir to your PATH to run it as 'kabootar'."
+    fi
+    ;;
 esac
 say "Try: kabootar send <file>"
