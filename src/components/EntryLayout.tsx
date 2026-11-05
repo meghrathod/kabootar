@@ -1,9 +1,16 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 
 import { draft } from "../lib/draft";
+import { isMobile } from "../lib/platform";
 import { useStore } from "../lib/useStore";
 import { Centered } from "./Centered";
+import { Icon } from "./Icon";
 import { Logo } from "./Logo";
+import { toast } from "./Toasts";
+
+const install = /Windows/.test(navigator.userAgent)
+  ? "irm https://kabootar.meghrathod.dev/install.ps1 | iex"
+  : "curl -fsSL https://kabootar.meghrathod.dev/install.sh | sh";
 
 /**
  * Logo, wordmark and the Send / Receive switch, mounted across both modes.
@@ -27,6 +34,20 @@ export function EntryLayout() {
         >
           Kabootar
         </h1>
+        {pathname === "/" && !compact && !isMobile && (
+          <button
+            className="mt-5 flex max-w-full items-center gap-2 rounded-lg border border-white/10 bg-ink-2 px-3 py-1.5 font-mono text-xs text-white/60 transition hover:text-white"
+            onClick={async () => {
+              await navigator.clipboard.writeText(install);
+              toast("Copied. Paste it in a terminal.", "success");
+            }}
+            aria-label="Copy the command that installs the kabootar CLI"
+          >
+            <span className="text-sky">$</span>
+            <span className="truncate">{install}</span>
+            <Icon name="copy" className="h-3.5 w-3.5 shrink-0" />
+          </button>
+        )}
         <nav
           className={`grid w-64 grid-cols-2 rounded-xl border border-white/10 bg-ink-2 p-1 transition-all ${ease} ${
             compact ? "mt-4" : "mt-7"
