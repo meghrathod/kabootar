@@ -18,9 +18,8 @@ export function toast(
   action?: Toast["action"],
 ) {
   const id = nextId++;
-  toasts.set((s) => ({
-    items: [...s.items.slice(-3), { id, message, tone, action }],
-  }));
+  // One at a time: a new toast replaces whatever is showing.
+  toasts.set({ items: [{ id, message, tone, action }] });
   if (!action) setTimeout(() => dismiss(id), tone === "error" ? 6000 : 3000);
 }
 
