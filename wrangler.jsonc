@@ -13,7 +13,7 @@
   // Build the PWA before every deploy, so a plain `wrangler deploy` (as run
   // by Cloudflare's GitHub integration) never ships without ./dist.
   "build": {
-    "command": "yarn build",
+    "command": "pnpm build",
     "watch_dir": ["src", "public", "index.html"]
   },
 

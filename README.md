@@ -32,16 +32,16 @@ The app and its signalling run on Cloudflare: a Worker serves the PWA and API, o
 
 ## Development
 
-Requires Node 24 and Yarn 4 (run `corepack enable` once; the version comes from `packageManager` in `package.json`).
+Requires Node 24 and pnpm (run `corepack enable` once; the version comes from `packageManager` in `package.json`).
 
 ```sh
-yarn install
-yarn build          # the worker serves dist/, so build once first
-yarn dev:worker     # Worker + Durable Objects locally on :8787
-yarn dev            # app with hot reload on http://localhost:3000
+pnpm install
+pnpm build          # the worker serves dist/, so build once first
+pnpm dev:worker     # Worker + Durable Objects locally on :8787
+pnpm dev            # app with hot reload on http://localhost:3000
 ```
 
-Or run the production build locally: `yarn preview` (http://localhost:8080).
+Or run the production build locally: `pnpm preview` (http://localhost:8080).
 
 Local secrets live in `.dev.vars` (git-ignored):
 
@@ -54,15 +54,15 @@ Testing on a phone needs HTTPS (service workers, clipboard and private storage a
 ### Tests
 
 ```sh
-yarn typecheck
-yarn test          # transfer engine: multi-file, resume, integrity, backpressure
-yarn test:worker   # signalling worker inside workerd with real Durable Objects
-yarn test:e2e      # two browsers doing a real WebRTC transfer (needs `yarn build`)
+pnpm typecheck
+pnpm test          # transfer engine: multi-file, resume, integrity, backpressure
+pnpm test:worker   # signalling worker inside workerd with real Durable Objects
+pnpm test:e2e      # two browsers doing a real WebRTC transfer (needs `pnpm build`)
 ```
 
 ## Deployment
 
-`yarn deploy` after a one-time setup; Cloudflare's GitHub integration deploys every push to `develop`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+`pnpm deploy` after a one-time setup; Cloudflare's GitHub integration deploys every push to `develop`. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## License
 

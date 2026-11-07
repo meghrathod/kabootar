@@ -30,7 +30,7 @@ Kabootar runs entirely on Cloudflare's free plan: one Worker serves the PWA, the
 4. **Deploy:**
 
    ```sh
-   yarn deploy
+   pnpm deploy
    ```
 
    Wrangler prints the URL, e.g. `https://kabootar.<your-subdomain>.workers.dev`.
@@ -43,13 +43,13 @@ Add the domain to your Cloudflare account, then add to `wrangler.jsonc`:
 "routes": [{ "pattern": "kabootar.example.com", "custom_domain": true }]
 ```
 
-and run `yarn deploy` again.
+and run `pnpm deploy` again.
 
 ## Continuous deployment
 
 Deploys are done by Cloudflare's GitHub integration (Workers Builds), so no API token is stored in GitHub. `.github/workflows/ci.yml` only runs typechecks, unit tests, worker tests and the end-to-end suite on every push and pull request.
 
-Connect the repository once in the dashboard: **Workers & Pages → kabootar → Settings → Builds → Connect** (pick this repository) and set the production branch to `develop`. The default build settings work: `wrangler deploy` runs `yarn build` itself (the `build` field in `wrangler.jsonc`), `.node-version` pins Node 24 to match CI, and the `packageManager` field in `package.json` pins the Yarn 4 release that wrote `yarn.lock`. Optionally, set the deploy command to `npx wrangler deploy --var VERSION:$WORKERS_CI_COMMIT_SHA` so `/healthz` reports the deployed commit.
+Connect the repository once in the dashboard: **Workers & Pages → kabootar → Settings → Builds → Connect** (pick this repository) and set the production branch to `develop`. The default build settings work: `wrangler deploy` runs `pnpm build` itself (the `build` field in `wrangler.jsonc`), `.node-version` pins Node 24 to match CI, and the `packageManager` field in `package.json` pins the pnpm release that wrote `pnpm-lock.yaml`. Optionally, set the deploy command to `npx wrangler deploy --var VERSION:$WORKERS_CI_COMMIT_SHA` so `/healthz` reports the deployed commit.
 
 Every push to `develop` is then built and deployed by Cloudflare and reported back as a **Workers Builds** check on the commit; the full build log is linked from that check. It runs alongside GitHub Actions CI, not after it, so a push that fails CI is still deployed.
 

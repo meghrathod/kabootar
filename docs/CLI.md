@@ -35,10 +35,10 @@ Each terminal cell is matched against glyph shapes (a 2×4 grid of coverage × b
 ```sh
 cd cli
 go test -race ./...
-go run ./cmd/kabootar send --server http://localhost:8787 some-file   # against `yarn dev:worker`
+go run ./cmd/kabootar send --server http://localhost:8787 some-file   # against `pnpm dev:worker`
 ```
 
-`yarn test:e2e` builds the CLI and runs `e2e/cli.spec.ts` with the browser tests (it needs Go installed).
+`pnpm test:e2e` builds the CLI and runs `e2e/cli.spec.ts` with the browser tests (it needs Go installed).
 
 ## Releasing
 
